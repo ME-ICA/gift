@@ -1,7 +1,7 @@
 function test_oracle_export()
 here = fileparts(mfilename('fullpath'));
 fixDir = fullfile(here, '..', '..', '..', '..', 'complex_ica_fixtures');
-for f = {'oracle_cebm.mat','oracle_ncfastica.mat','nf_table.csv','complex_nf_table.csv'}
+for f = {'oracle_cebm.mat','oracle_ncfastica.mat','nf_table.mat','complex_nf_table.mat'}
     assert(exist(fullfile(fixDir, f{1}), 'file') == 2, ['missing ' f{1}]);
 end
 d = load(fullfile(fixDir, 'complex_sources.mat'));
