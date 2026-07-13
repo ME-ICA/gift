@@ -24,16 +24,18 @@ if (strcmpi(modalityType, 'fmri'))
         'SDD ICA', 'Semi-blind Infomax', 'Constrained ICA (Spatial)', 'Radical ICA', ...
         'Combi', 'ICA-EBM', 'ERBM', 'IVA-GL', 'MOO-ICAR', 'IVA-L', 'Sparse ICA-EBM', ...
         'IVA-L-SOS', 'IVA-L-SOS-Adaptive', 'Adaptive Reverse Constrained ICA EBM', ...
-        'Adaptive Reverse Constrained IVA Gauss', 'Threshold Free Constrained IVA Gauss');
+        'Adaptive Reverse Constrained IVA Gauss', 'Threshold Free Constrained IVA Gauss', ...
+        'Complex ICA-EBM', 'Complex nc-FastICA');
 elseif (strcmpi(modalityType, 'smri'))
     % all the available algorithms for EEG data
     icaAlgo = char('Infomax', 'Fast ICA', 'Erica', 'Simbec', 'Evd', 'Jade Opac', 'Amuse', ...
         'SDD ICA', 'Radical ICA', 'Combi', 'ICA-EBM', 'ERBM', 'IVA-GL', 'IVA-L', 'MOO-ICAR', 'Sparse ICA-EBM', 'IVA-L-SOS', ...
-        'Constrained ICA (Spatial)');
+        'Constrained ICA (Spatial)', 'Complex ICA-EBM', 'Complex nc-FastICA');
 else
     % all the available algorithms for EEG data
     icaAlgo = char('Infomax', 'Fast ICA', 'Erica', 'Simbec', 'Evd', 'Jade Opac', 'Amuse', ...
-        'SDD ICA', 'Radical ICA', 'Combi', 'ICA-EBM', 'ERBM', 'IVA-GL', 'IVA-L', 'Sparse ICA-EBM', 'IVA-L-SOS');
+        'SDD ICA', 'Radical ICA', 'Combi', 'ICA-EBM', 'ERBM', 'IVA-GL', 'IVA-L', 'Sparse ICA-EBM', 'IVA-L-SOS', ...
+        'Complex ICA-EBM', 'Complex nc-FastICA');
 end
 
 
@@ -213,11 +215,30 @@ if (nargin > 0 && nargin <= 3)
             
         case {'fbss', 'erbm'}
             %% Real-valued full blind source separation
-            
+
             W = icatb_fbss(data, ICA_Options{:});
             icasig_tmp = W*data;
             A = pinv(W);
-            
+
+        case 'complex ica-ebm'
+            %% Complex ICA by entropy bound minimization (Li & Adalí 2010)
+
+            W = icatb_complex_ica_ebm(data);
+            icasig_tmp = W*data;
+            A = pinv(W);
+
+        case 'complex nc-fastica'
+            %% Noncircular complex FastICA (Novey & Adalí 2008)
+
+            typeStr = 'log';
+            if (~isempty(ICA_Options))
+                tInd = strmatch('nonlinearity', lower(ICA_Options(1:2:end)), 'exact');
+                if (~isempty(tInd)); typeStr = ICA_Options{2*tInd}; end
+            end
+            W = icatb_complex_nc_fastica(data, typeStr);
+            icasig_tmp = W*data;
+            A = pinv(W);
+
         case 'iva-gl'
             
             %% IVA
