@@ -600,6 +600,14 @@ end
 drawnow;
 
 
+% Complex phase-ambiguity correction: orient each component to the real axis
+% before saving. Rotate icasig (maps), A (mixing), and W (demixing) together so
+% icasig = W*data and data = A*icasig remain consistent after the rotation.
+if (~isreal(icasig))
+    [icasig, A, theta_pc] = icatb_complex_phase_correct(icasig, A, true(size(icasig, 2), 1));
+    W = diag(exp(1i .* theta_pc)) * W;
+end
+
 if (exist('skew', 'var'))
     icatb_save(icaout, 'W', 'icasig', 'mask_ind', 'skew');
 else
