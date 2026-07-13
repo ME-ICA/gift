@@ -86,12 +86,14 @@ function W = icatb_complex_ica_ebm(data)
 % Input:  data - (components x volume) complex matrix (N x T)
 % Output: W    - (N x N) complex demixing matrix; icasig = W*data
 %
-% Wraps CEBM (Li & Adalí 2010). Requires nf_table.mat on the path (shipped
-% alongside this file). GPL v3 — see CEBM.m header; cite Li & Adalí 2010.
+% Wraps complex_ICA_EBM (Li & Adalí 2010). NOTE: the vendored file is
+% complex_ICA_EBM.m (its declared function name is CEBM, but MATLAB dispatches
+% by FILENAME, so it must be called as complex_ICA_EBM). Requires nf_table.mat
+% on the path (shipped alongside this file). GPL v3; cite Li & Adalí 2010.
 if isreal(data)
     error('icatb_complex_ica_ebm:realInput', 'Complex ICA-EBM requires complex-valued data.');
 end
-W = CEBM(data);
+W = complex_ICA_EBM(data);
 end
 ```
 
@@ -219,9 +221,9 @@ assert(any(strcmp(names, 'complex nc-fastica')), 'complex nc-fastica not registe
 % dispatch runs and returns W, A, icasig with correct shapes
 rng(1); N = 3; T = 1500;
 S = randn(N,T) + 1i*randn(N,T); A0 = randn(N,N)+1i*randn(N,N); X = A0*S;
-[W, A, icasig] = icatb_icaAlgorithm('complex ica-ebm', X);
+[~, W, A, icasig] = icatb_icaAlgorithm('complex ica-ebm', X);   % varargout{1} is the algo list — discard it
 assert(isequal(size(W), [N N]) && isequal(size(icasig), [N T]), 'ebm dispatch shapes');
-[W2, A2, icasig2] = icatb_icaAlgorithm('complex nc-fastica', X);
+[~, W2, A2, icasig2] = icatb_icaAlgorithm('complex nc-fastica', X);
 assert(isequal(size(W2), [N N]) && isequal(size(icasig2), [N T]), 'ncfastica dispatch shapes');
 disp('PASS test_dispatch_complex');
 end
@@ -860,7 +862,7 @@ C  = (Zm * Zm') / size(Zm, 2);        % (T x T) Hermitian covariance
 Xr = (U(:, 1:N)' ./ sqrt(d(1:N))) * Zm;    % (N x Vm) whitened mixture
 
 % === Step 3: complex ICA through the real GIFT dispatch (Task 3) ===
-[W, A, icasig] = icatb_icaAlgorithm('complex ica-ebm', Xr);   %#ok<ASGLU>
+[~, W, A, icasig] = icatb_icaAlgorithm('complex ica-ebm', Xr);   %#ok<ASGLU>
 assert(isequal(size(icasig), [N, size(Xr, 2)]), 'icasig must be N x Vm');
 
 % recovery: each estimated source matches one true source (over masked voxels)
