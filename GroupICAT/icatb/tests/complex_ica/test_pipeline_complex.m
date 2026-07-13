@@ -38,7 +38,7 @@ C  = (Zm * Zm') / size(Zm, 2);        % (T x T) Hermitian covariance
 Xr = (U(:, 1:N)' ./ sqrt(d(1:N))) * Zm;    % (N x Vm) whitened mixture
 
 % === Step 3: complex ICA through the real GIFT dispatch (Task 3) ===
-[W, A, icasig] = icatb_icaAlgorithm('complex ica-ebm', Xr);   %#ok<ASGLU>
+[~, W, A, icasig] = icatb_icaAlgorithm('complex ica-ebm', Xr);   %#ok<ASGLU>
 assert(isequal(size(icasig), [N, size(Xr, 2)]), 'icasig must be N x Vm');
 
 % recovery: each estimated source matches one true source (over masked voxels)
