@@ -1,5 +1,7 @@
 function test_dispatch_complex()
-addpath(genpath(fullfile(fileparts(mfilename('fullpath')), '..', '..', 'icatb_analysis_functions')));
+% all of icatb: icatb_icaAlgorithm depends on icatb_get_modality, which lives at the
+% icatb/ root rather than under icatb_analysis_functions/
+addpath(genpath(fullfile(fileparts(mfilename('fullpath')), '..', '..')));
 % names appear in the algorithm list
 algos = icatb_icaAlgorithm;
 names = lower(cellstr(algos));
