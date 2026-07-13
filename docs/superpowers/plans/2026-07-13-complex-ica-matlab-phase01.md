@@ -759,20 +759,29 @@ Expected: prints `PASS test_phase_correct`.
 
 - [ ] **Step 5: Wire into `icatb_calculateICA.m`**
 
-In `icatb_calculateICA.m`, the complex-write path is guarded by `WRITE_COMPLEX_IMAGES` (assigned at :623). Locate where the final `icasig` and `A` are available for complex data just before they are split/written (~:637–655). Immediately before that write, apply the correction:
+Place the correction where the final `W`, `icasig`, and `A` are all live and *before any of
+them is saved or reshaped*, so the three stay mutually consistent. In the current tree that
+is immediately **before line 603** — the `if (exist('skew', 'var'))` that precedes
+`icatb_save(icaout, 'W', 'icasig', 'mask_ind', ...)`. (`A` is saved just after, at :617;
+complex `icasig`/`A` are reshaped by `complex_data()` at :639/:651 — the correction must run
+before all of these.) Insert:
 
 ```matlab
-    if (strcmpi(sesInfo.userInput.dataType, 'complex'))
-        % Fix per-component phase ambiguity on high-quality (masked) voxels.
-        pcMask = true(size(icasig, 2), 1);
-        if (isfield(sesInfo, 'mask_ind') && ~isempty(sesInfo.mask_ind))
-            pcMask = true(size(icasig, 2), 1);   % icasig already restricted to mask_ind
-        end
-        [icasig, A] = icatb_complex_phase_correct(icasig, A, pcMask);
-    end
+% Complex phase-ambiguity correction: orient each component to the real axis
+% before saving. Rotate icasig (maps), A (mixing), and W (demixing) together so
+% icasig = W*data and data = A*icasig remain consistent after the rotation.
+if (~isreal(icasig))
+    [icasig, A, theta_pc] = icatb_complex_phase_correct(icasig, A, true(size(icasig, 2), 1));
+    W = diag(exp(1i .* theta_pc)) * W;
+end
 ```
 
-*(`icasig` here is `(components × voxels)` = `(N×V)` and `A` is the mixing whose product reconstructs the data — matching the function's `(N×V)` / `(M×N)` contract. `icasig` columns already correspond to in-mask voxels, so the default all-true `pcMask` is correct; refine only if you carry a within-mask quality sub-selection. Confirm the variable names `icasig`/`A` at this point in your tree and adjust if the local names differ.)*
+*(`icasig` is `(N×V)` = components × in-mask voxels; `A = pinv(W)` is `(N×N)` with columns =
+components; `W` is `(N×N)`. The function rotates row `k` of `icasig` by `e^{jθ_k}` and column
+`k` of `A` by `e^{-jθ_k}` (preserving `A*icasig`); rotating row `k` of `W` by `e^{jθ_k}` keeps
+`icasig = W*data`. `icasig` columns are already the in-mask voxels, so the all-true mask is
+correct. Guarding on `~isreal(icasig)` means the real-data path is untouched. Confirm the
+locals `W`/`icasig`/`A` at this point — they are the ones saved at :604/:617.)*
 
 - [ ] **Step 6: Commit**
 
@@ -783,97 +792,126 @@ git commit -m "feat(complex-ica): phase-ambiguity correction + calculateICA hook
 
 ---
 
-## Task 9: End-to-end complex analysis smoke test
+## Task 9: In-memory pipeline integration test
 
 **Files:**
-- Create: `GroupICAT/icatb/tests/complex_ica/test_end_to_end_complex.m`
-- Create (test asset): `GroupICAT/icatb/tests/complex_ica/write_complex_test_nifti.m`
+- Create: `GroupICAT/icatb/tests/complex_ica/test_pipeline_complex.m`
 
 **Interfaces:**
-- Consumes: the full patched pipeline (Tasks 1–8): complex I/O, `dataType='complex'`, phase mask, complex ICA dispatch, phase correction.
-- Produces: proof that a batch complex ICA run completes and writes split complex outputs.
+- Consumes the wired components from Tasks 3, 7, 8 composed as a pipeline:
+  `icatb_complex_phase_mask` → Hermitian PCA reduction → the real
+  `icatb_icaAlgorithm('complex ica-ebm', …)` dispatch → `icatb_complex_phase_correct`.
+- Produces: proof that the patched pipeline glues together and recovers known complex
+  sources end-to-end, without any file/batch I/O.
 
-- [ ] **Step 1: Write a helper that writes R_/I_ NIfTI test volumes**
+> **Why in-memory, not batch (amended during execution):** the original batch/NIfTI
+> smoke test depended on GIFT internals that cannot be verified offline (the NIfTI
+> writer's header contract, the batch entry point, file-selection helpers), so a
+> transcribed version would likely hand the user a broken script. This in-memory test
+> drives the *actual* wired code paths (the real dispatch + the two new phase functions)
+> with data it constructs itself, so it is reliably runnable. A full batch run on real
+> `R_`/`I_` NIfTI data remains a valuable **manual** validation for the user to perform
+> with a real dataset; it is not automated here. `icatb_icaAlgorithm` calls
+> `icatb_get_modality`, which defaults to `'fmri'` (the list carrying the new complex
+> algorithms) when no modality appdata is set — so the bare test needs no special setup.
 
-`write_complex_test_nifti.m`:
+- [ ] **Step 1: Write the pipeline integration test**
 
-```matlab
-function outDir = write_complex_test_nifti(outDir)
-%% Write a tiny synthetic complex fMRI dataset as R_/I_ NIfTI pairs for one subject.
-if (~exist('outDir', 'var') || isempty(outDir)); outDir = tempname; end
-if (~exist(outDir, 'dir')); mkdir(outDir); end
-dim = [8 8 4]; T = 30; rng(11);
-V = prod(dim);
-cS = (randn(3,V) + 1i*0.1*randn(3,V));
-tc = randn(T,3) + 1i*0.1*randn(T,3);
-cX = tc*cS;                                 % (T x V) complex
-for t = 1:T
-    vol = reshape(cX(t, :), dim);
-    icatb_write_nifti_data(fullfile(outDir, sprintf('R_sub01_%03d.nii', t)), makeHdr(dim), real(vol));
-    icatb_write_nifti_data(fullfile(outDir, sprintf('I_sub01_%03d.nii', t)), makeHdr(dim), imag(vol));
-end
-end
-
-function H = makeHdr(dim)
-H = struct('dim', dim, 'dt', [16 0], 'mat', eye(4));  % adapt to icatb_write_nifti_data's expected header
-end
-```
-
-*(Header construction must match whatever `icatb_write_nifti_data` — or the NIfTI writer available in your GIFT tree — expects. If that helper's signature differs, use the writer GIFT uses elsewhere for test data; the essential requirement is R_/I_ prefixed pairs per §2 of the reference doc.)*
-
-- [ ] **Step 2: Write the end-to-end test**
-
-`test_end_to_end_complex.m`:
+`test_pipeline_complex.m`:
 
 ```matlab
-function test_end_to_end_complex()
+function test_pipeline_complex()
+%% In-memory integration test of the wired complex pipeline (Tasks 3, 7, 8):
+%%   phase-quality mask -> Hermitian PCA reduction -> complex ICA dispatch
+%%   ('complex ica-ebm') -> phase-ambiguity correction. No file/batch I/O.
 here = fileparts(mfilename('fullpath'));
-addpath(genpath(fullfile(here, '..', '..')));
-dataDir = write_complex_test_nifti();
-outDir = tempname; mkdir(outDir);
+addpath(genpath(fullfile(here, '..', '..')));   % all of icatb (dispatch + complex_ica + deps)
+rng(21);
 
-% Build a minimal complex batch input struct and run setup + analysis.
-sesInfo = struct();
-sesInfo.userInput.pwd = outDir;
-sesInfo.userInput.prefix = 'cxtest';
-sesInfo.userInput.dataType = 'complex';
-sesInfo.userInput.read_complex_images  = 'real&imaginary';
-sesInfo.userInput.write_complex_images = 'real&imaginary';
-sesInfo.userInput.algorithm = 'complex ica-ebm';
-sesInfo.userInput.numComp = 3;
-sesInfo.userInput.files = struct('name', spm_select_or_dir(dataDir, 'R_sub01'));
+N = 3;              % sources
+Vsig = 1000;        % signal voxels (stable phase)
+Vnoise = 300;       % noise voxels (random phase)
+V = Vsig + Vnoise;
+T = 60;             % timepoints
 
-% Run the reduction + ICA + back-recon path GIFT uses in batch.
-sesInfo = icatb_runAnalysis(sesInfo, 1);   % adapt to the batch entry point in your tree
+% --- complex spatial sources over signal voxels; ~0 over noise voxels ---
+Ssig = randn(N, Vsig) .* (abs(randn(N, Vsig)).^1.5);          % super-Gaussian maps
+Ssig = Ssig .* repmat(exp(1i*0.05*randn(N,1)), 1, Vsig);      % small consistent source phase
+S = [Ssig, 0.001*(randn(N, Vnoise) + 1i*randn(N, Vnoise))];   % (N x V)
 
-% Assert split complex outputs were written (R_/I_ component maps).
-comp = dir(fullfile(outDir, '*_component_ica_*.nii'));
-assert(~isempty(comp), 'no complex component maps written');
-disp('PASS test_end_to_end_complex');
+% --- complex time mixing (T x N), full column rank ---
+Mtc = randn(T, N) + 1i*randn(T, N);
+
+% --- full data (V x T); overwrite noise voxels with random-phase series ---
+Z = (Mtc * S).';                                             % (V x T)
+Z(Vsig+1:end, :) = (0.5 + rand(Vnoise, T)) .* exp(1i*2*pi*rand(Vnoise, T));
+
+% === Step 1: phase-quality mask over voxels (Task 7) ===
+[mask, ~] = icatb_complex_phase_mask(Z, true(V, 1));
+assert(mean(mask(1:Vsig)) > 0.8, 'mask must keep most signal voxels');
+assert(mean(mask(Vsig+1:end)) < 0.05, 'mask must drop noise voxels');
+
+% === Step 2: Hermitian PCA reduction of masked data (T x Vm) -> (N x Vm) ===
+Zm = Z(mask, :).';                    % (T x Vm)
+Zm = Zm - mean(Zm, 2);                % de-mean per timepoint
+C  = (Zm * Zm') / size(Zm, 2);        % (T x T) Hermitian covariance
+[U, d] = eig(C, 'vector');
+[d, idx] = sort(real(d), 'descend'); U = U(:, idx);
+Xr = (U(:, 1:N)' ./ sqrt(d(1:N))) * Zm;    % (N x Vm) whitened mixture
+
+% === Step 3: complex ICA through the real GIFT dispatch (Task 3) ===
+[W, A, icasig] = icatb_icaAlgorithm('complex ica-ebm', Xr);   %#ok<ASGLU>
+assert(isequal(size(icasig), [N, size(Xr, 2)]), 'icasig must be N x Vm');
+
+% recovery: each estimated source matches one true source (over masked voxels)
+% up to permutation + complex scale/phase
+Strue = S(:, mask);                                          % (N x Vm)
+corrM = abs(icasig * Strue') ./ ...
+        (sqrt(sum(abs(icasig).^2, 2)) * sqrt(sum(abs(Strue).^2, 2))');
+corrM = corrM ./ max(corrM, [], 2);
+assert(all(sum(corrM > 0.5, 2) == 1), 'each estimated source matches one true source');
+
+% === Step 4: phase-ambiguity correction (Task 8) ===
+recon = A * icasig;
+[icasig2, A2, ~] = icatb_complex_phase_correct(icasig, A, true(size(icasig, 2), 1));
+assert(norm(recon - A2*icasig2, 'fro') / norm(recon, 'fro') < 1e-10, 'A*S preserved');
+imagFrac = sum(imag(icasig2).^2, 2) ./ sum(abs(icasig2).^2, 2);
+assert(all(imagFrac < 0.1), 'corrected maps concentrate energy on the real axis');
+
+disp('PASS test_pipeline_complex');
 end
 ```
 
-*(This task is the integration proof; its exact wiring depends on GIFT's batch entry point (`icatb_runAnalysis` / `icatb_batch_file_run`) and file-selection helpers in your tree. Treat the specific calls as adapt-to-your-version — the assertion that matters is: a `dataType='complex'` run with `algorithm='complex ica-ebm'` completes and writes split complex component maps. If full batch wiring is heavier than warranted here, reduce to driving `icatb_dataReduction` → `icatb_calculateICA` directly on the loaded complex matrix.)*
+*(The reduction mirrors GIFT's Hermitian complex whitening; the ICA runs through the
+**real** `icatb_icaAlgorithm` dispatch registered in Task 3, so this exercises the actual
+wiring, not the vendored function in isolation. The recovery/alignment/reconstruction
+assertions are the same indeterminacy-aware checks used in the unit tests, now applied to
+the composed pipeline.)*
 
-- [ ] **Step 3: Run the test** *(user-run)*
+- [ ] **Step 2: Run the test** *(user-run)*
 
-Run in MATLAB: `matlab -batch "cd('GroupICAT/icatb/tests/complex_ica'); test_end_to_end_complex"`
-Expected: prints `PASS test_end_to_end_complex` (a real complex group analysis ran inside GIFT).
+Run in MATLAB: `matlab -batch "cd('GroupICAT/icatb/tests/complex_ica'); test_pipeline_complex"`
+Expected: prints `PASS test_pipeline_complex` (mask, real ICA dispatch, and phase correction compose and recover the sources).
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add GroupICAT/icatb/tests/complex_ica/test_end_to_end_complex.m GroupICAT/icatb/tests/complex_ica/write_complex_test_nifti.m
-git commit -m "test(complex-ica): end-to-end complex analysis smoke test"
+git add GroupICAT/icatb/tests/complex_ica/test_pipeline_complex.m
+git commit -m "test(complex-ica): in-memory pipeline integration test"
 ```
 
-> **Phase 1 exit criterion (Spec §9):** a real complex group analysis runs inside GIFT from batch; phase-step property tests (Tasks 7–8) pass. Deliverable: patched GIFT with complex ICA + committed fixtures/tables. Next: Phase 2 (Python), which consumes `complex_ica_fixtures/` as its oracle.
+> **Phase 1 exit criterion (Spec §9):** the pipeline integration test passes (mask → real
+> `complex ica-ebm` dispatch → phase correction recover known complex sources); phase-step
+> property tests (Tasks 7–8) pass. Deliverable: patched GIFT with complex ICA + committed
+> fixtures/tables. A full batch run on real `R_`/`I_` NIfTI data is a recommended **manual**
+> user validation (not automated here). Next: Phase 2 (Python), which consumes
+> `complex_ica_fixtures/` as its oracle.
 
 ---
 
 ## Notes for the implementer
 
 - **You cannot run MATLAB in the dev environment.** Write every `.m` exactly as specified; the user runs each "Run the test" step and reports PASS/FAIL. Do not mark a step done until the user confirms.
-- **Adapt-to-your-tree markers** (Tasks 6–9) call out GIFT internals whose exact names/signatures may drift by release (`icatb_read_variable`, `icatb_eval_script`, `icatb_write_nifti_data`, the batch entry point, `icasig`/`A` locals). Verify each against the actual file before editing; the surrounding code shows the local conventions.
+- **Adapt-to-your-tree markers** (Tasks 6–8) call out GIFT internals whose exact names/signatures may drift by release (`inputData` field access in the batch reader, the `icasig`/`A`/`W` locals in `icatb_calculateICA.m`, the `nonZeroInd`/`mask_ind` anchors in `icatb_createMask.m`). Verify each against the actual file before editing; the surrounding code shows the local conventions. (Task 9 is self-contained and needs no such adaptation.)
 - **GPL v3 headers** stay on every vendored and derived file (Global Constraints).
 - **Fixtures are the contract** for Phases 2–3 — never regenerate them non-deterministically or hand-edit the `.mat`/CSV; if a fixture must change, re-run its generator (seeded) and re-commit both generator and output together.
