@@ -355,12 +355,21 @@ git commit -m "feat(complex-ica): deterministic complex fixtures generator + fix
 
 **Files:**
 - Create: `GroupICAT/icatb/tests/complex_ica/export_oracle.m`
-- Output (git-tracked): `complex_ica_fixtures/oracle_cebm.mat`, `complex_ica_fixtures/oracle_ncfastica.mat`, `complex_ica_fixtures/nf_table.csv`, `complex_ica_fixtures/complex_nf_table.csv`
+- Output (git-tracked): `complex_ica_fixtures/oracle_cebm.mat`, `complex_ica_fixtures/oracle_ncfastica.mat`, `complex_ica_fixtures/nf_table.mat`, `complex_ica_fixtures/complex_nf_table.mat`
 - Test: `GroupICAT/icatb/tests/complex_ica/test_oracle_export.m`
 
 **Interfaces:**
-- Consumes: `complex_ica_fixtures/complex_sources.mat` (Task 4); `icatb_complex_ica_ebm`, `icatb_complex_nc_fastica` (Tasks 1–2); `nf_table.mat`.
-- Produces: per-estimator `W`, `Ahat`, `Shat` saved as `.mat`; `nf1..nf8` lookup vectors exported to CSV. These are the ground truth the Python/Rust tracks diff against (Spec §8).
+- Consumes: `complex_ica_fixtures/complex_sources.mat` (Task 4); `icatb_complex_ica_ebm`, `icatb_complex_nc_fastica` (Tasks 1–2); `nf_table.mat`, `complex_nf_table.mat`.
+- Produces: per-estimator `W`, `Ahat`, `Shat` saved as `.mat`; the two nonlinearity lookup tables **copied verbatim** into `complex_ica_fixtures/` as `.mat`. These are the ground truth the Python/Rust tracks diff against (Spec §8).
+
+> **Design note (amended during execution):** the `nf_table.mat` / `complex_nf_table.mat`
+> variables are MATLAB **structs** (each `nfK` holds scalar fields plus a `pp`
+> piecewise-polynomial spline sub-struct), *not* flat numeric vectors. A hand-written
+> MATLAB struct→CSV serializer would crash (`fprintf('%.17g', struct)`), so this task ships
+> the two `.mat` tables unchanged. The **Python track (Phase 2)** reads them with
+> `scipy.io.loadmat` (which handles the nested structs) and emits the canonical portable
+> export — `breaks`, `coefs`, and scalar fields per nonlinearity — which the Rust track
+> then consumes. Table-flattening therefore moves to Phase 2, where the tooling exists.
 
 - [ ] **Step 1: Write the export harness**
 
@@ -371,6 +380,7 @@ function export_oracle()
 here = fileparts(mfilename('fullpath'));
 addpath(genpath(fullfile(here, '..', '..', 'icatb_analysis_functions', 'icatb_algorithms', 'complex_ica')));
 fixDir = fullfile(here, '..', '..', '..', '..', 'complex_ica_fixtures');
+if (~exist(fixDir, 'dir')); mkdir(fixDir); end
 d = load(fullfile(fixDir, 'complex_sources.mat'));
 
 % --- oracle decompositions ---
@@ -379,28 +389,17 @@ save(fullfile(fixDir, 'oracle_cebm.mat'), 'W', 'Ahat', 'Shat', '-v7');
 W = icatb_complex_nc_fastica(d.cX, 'log'); Ahat = pinv(W); Shat = W*d.cX;
 save(fullfile(fixDir, 'oracle_ncfastica.mat'), 'W', 'Ahat', 'Shat', '-v7');
 
-% --- portable lookup tables ---
-export_nf('nf_table.mat',         fullfile(fixDir, 'nf_table.csv'));
-export_nf('complex_nf_table.mat', fullfile(fixDir, 'complex_nf_table.csv'));
+% --- ship the nonlinearity lookup tables verbatim ---
+% These are structs (piecewise-polynomial spline forms); the Python track
+% flattens them to a portable canonical format (see Design note above).
+copyfile(which('nf_table.mat'),         fullfile(fixDir, 'nf_table.mat'));
+copyfile(which('complex_nf_table.mat'), fullfile(fixDir, 'complex_nf_table.mat'));
 disp('export_oracle done');
-end
-
-function export_nf(matName, csvPath)
-S = load(matName);                 % nf_table.mat defines nf1..nf8 (and grid vars)
-vars = fieldnames(S);
-% write each variable as its own CSV column-block: name on header row, values below
-fid = fopen(csvPath, 'w');
-for k = 1:numel(vars)
-    v = S.(vars{k});
-    fprintf(fid, '%s\n', vars{k});
-    fprintf(fid, '%.17g\n', v(:));
-    fprintf(fid, '\n');
-end
-fclose(fid);
 end
 ```
 
-*(`nf_table.mat` is loaded by bare name — it is on the path via the addpath above. Inspect its actual variable names on first run; the harness exports whatever variables it contains, so no assumption about `nf1..nf8` is hard-coded in the writer.)*
+*(`which('nf_table.mat')` resolves the table on the path added above and copies it into the
+fixtures dir unchanged — no MATLAB-side serialization of the struct forms.)*
 
 - [ ] **Step 2: Write the test**
 
@@ -410,7 +409,7 @@ end
 function test_oracle_export()
 here = fileparts(mfilename('fullpath'));
 fixDir = fullfile(here, '..', '..', '..', '..', 'complex_ica_fixtures');
-for f = {'oracle_cebm.mat','oracle_ncfastica.mat','nf_table.csv','complex_nf_table.csv'}
+for f = {'oracle_cebm.mat','oracle_ncfastica.mat','nf_table.mat','complex_nf_table.mat'}
     assert(exist(fullfile(fixDir, f{1}), 'file') == 2, ['missing ' f{1}]);
 end
 d = load(fullfile(fixDir, 'complex_sources.mat'));
@@ -432,11 +431,11 @@ Expected: `export_oracle done` then `PASS test_oracle_export`.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add GroupICAT/icatb/tests/complex_ica/export_oracle.m GroupICAT/icatb/tests/complex_ica/test_oracle_export.m complex_ica_fixtures/oracle_cebm.mat complex_ica_fixtures/oracle_ncfastica.mat complex_ica_fixtures/nf_table.csv complex_ica_fixtures/complex_nf_table.csv
-git commit -m "feat(complex-ica): oracle decomposition + portable nf_table export"
+git add GroupICAT/icatb/tests/complex_ica/export_oracle.m GroupICAT/icatb/tests/complex_ica/test_oracle_export.m complex_ica_fixtures/oracle_cebm.mat complex_ica_fixtures/oracle_ncfastica.mat complex_ica_fixtures/nf_table.mat complex_ica_fixtures/complex_nf_table.mat
+git commit -m "feat(complex-ica): oracle decompositions + shipped nf_table lookup tables"
 ```
 
-> **Phase 0 exit criterion (Spec §9):** `complex_ica_fixtures/` populated and committed; estimators dispatch end-to-end in GIFT; `nf_table` export sanity-checked. Tasks 6–9 (Phase 1) can now proceed; the Python track can begin in parallel once these fixtures exist.
+> **Phase 0 exit criterion (Spec §9):** `complex_ica_fixtures/` populated and committed (oracle decompositions + the two `nf_table` `.mat` tables); estimators dispatch end-to-end in GIFT. Tasks 6–9 (Phase 1) can now proceed; the Python track (Phase 2) can begin once these fixtures exist and owns flattening the lookup tables to the canonical portable format.
 
 ---
 
