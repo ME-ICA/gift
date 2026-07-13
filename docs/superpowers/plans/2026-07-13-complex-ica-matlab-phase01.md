@@ -485,15 +485,26 @@ In `icatb_read_batch_file.m`, replace the hardcoded line 220:
 dataType = 'real'; read_complex_images = 'real&imaginary'; write_complex_images = 'real&imaginary';
 ```
 
-with a read-from-input-with-default block:
+with a read-from-input-with-default block. The batch reader parses the input file into a
+struct `inputData` (via `icatb_eval_script`) and reads fields with `isfield(inputData, …)`
+throughout — match that idiom exactly (there is **no** `icatb_read_variable` helper in this
+tree):
 
 ```matlab
-dataType = icatb_read_variable(inputData, 'dataType', 'char', 'real');
-read_complex_images  = icatb_read_variable(inputData, 'read_complex_images',  'char', 'real&imaginary');
-write_complex_images = icatb_read_variable(inputData, 'write_complex_images', 'char', 'real&imaginary');
+dataType = 'real'; read_complex_images = 'real&imaginary'; write_complex_images = 'real&imaginary';
+if (isfield(inputData, 'dataType') && ~isempty(inputData.dataType))
+    dataType = inputData.dataType;
+end
+if (isfield(inputData, 'read_complex_images') && ~isempty(inputData.read_complex_images))
+    read_complex_images = inputData.read_complex_images;
+end
+if (isfield(inputData, 'write_complex_images') && ~isempty(inputData.write_complex_images))
+    write_complex_images = inputData.write_complex_images;
+end
 ```
 
-*(Use the same accessor the surrounding code uses to pull fields from the parsed input — match the local variable name holding the parsed input struct, e.g. `inputData`/`sesInfo`. If no generic reader exists nearby, use a guarded `if isfield(...)` with the same three defaults.)*
+*(Keeps the three defaults; only overrides when the input file provides the field. `inputData`
+is the local struct holding the parsed input at this point in `icatb_read_batch_file.m`.)*
 
 - [ ] **Step 4: Un-hardcode in the GUI setup**
 
