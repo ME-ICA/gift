@@ -12,26 +12,45 @@ Vnoise = 300;       % noise voxels (random phase)
 V = Vsig + Vnoise;
 T = 60;             % timepoints
 
-% --- complex spatial sources over signal voxels; ~0 over noise voxels ---
-Ssig = randn(N, Vsig) .* (abs(randn(N, Vsig)).^1.5);          % super-Gaussian maps
-Ssig = Ssig .* repmat(exp(1i*0.05*randn(N,1)), 1, Vsig);      % small consistent source phase
-S = [Ssig, 0.001*(randn(N, Vnoise) + 1i*randn(N, Vnoise))];   % (N x V)
+% Physical model of complex fMRI:  z(v,t) = rho(v,t) * exp(1i*phi(v))
+%   - rho(v,t): POSITIVE magnitude series (static baseline + BOLD-like modulation)
+%   - phi(v):   STATIC per-voxel background phase (B0/receiver), small spread
+% This is what makes signal voxels phase-stable over time (which is what the
+% phase-quality mask keys on) while keeping each component's voxels clustered
+% along a line (which is what the phase-ambiguity correction needs). The Adali
+% complex-fMRI simulation uses the same structure (per-voxel phase jitter ~ +/-10 deg).
 
-% --- complex time mixing (T x N), full column rank ---
-Mtc = randn(T, N) + 1i*randn(T, N);
+% --- real, super-Gaussian spatial maps (non-Gaussian => ICA-separable) ---
+Smaps = randn(N, Vsig) .* (abs(randn(N, Vsig)).^1.5);
+Smaps = Smaps ./ max(abs(Smaps(:)));                      % scale to [-1, 1]
 
-% --- full data (V x T); overwrite noise voxels with random-phase series ---
-Z = (Mtc * S).';                                             % (V x T)
-Z(Vsig+1:end, :) = (0.5 + rand(Vnoise, T)) .* exp(1i*2*pi*rand(Vnoise, T));
+% --- real time courses (T x N), full column rank ---
+tc = randn(T, N);
+
+% --- static per-voxel background phase: small spread (+/-10 deg), as in the Adali sim ---
+phi = (rand(1, Vsig)*20 - 10) / 180 * pi;
+
+% --- positive magnitude: large static baseline + modulation ---
+base = 100 + 10*rand(1, Vsig);                            % static baseline image
+M = repmat(base, T, 1) + 5*(tc * Smaps);                  % (T x Vsig)
+assert(all(M(:) > 0), 'magnitude must stay positive (baseline dominates modulation)');
+
+% --- full data (V x T): signal voxels phase-stable; noise voxels random phase ---
+Zsig = (M .* repmat(exp(1i*phi), T, 1)).';                % (Vsig x T)
+Znoise = (0.5 + rand(Vnoise, T)) .* exp(1i*2*pi*rand(Vnoise, T));
+Z = [Zsig; Znoise];                                       % (V x T)
 
 % === Step 1: phase-quality mask over voxels (Task 7) ===
 [mask, ~] = icatb_complex_phase_mask(Z, true(V, 1));
-assert(mean(mask(1:Vsig)) > 0.8, 'mask must keep most signal voxels');
-assert(mean(mask(Vsig+1:end)) < 0.05, 'mask must drop noise voxels');
+assert(mean(mask(1:Vsig)) > 0.9, 'mask must keep signal voxels (stable phase)');
+assert(mean(mask(Vsig+1:end)) < 0.05, 'mask must drop noise voxels (random phase)');
 
-% === Step 2: Hermitian PCA reduction of masked data (T x Vm) -> (N x Vm) ===
+% === Step 2: strip the static baseline, then Hermitian PCA reduce (T x Vm) -> (N x Vm) ===
 Zm = Z(mask, :).';                    % (T x Vm)
-Zm = Zm - mean(Zm, 2);                % de-mean per timepoint
+% Per-VOXEL temporal de-mean: removes the static complex baseline image. (This is the
+% deliberate axis choice for complex data -- see reference doc §5 -- and it leaves a clean
+% mixture Zm = tc_dm * Strue, with Strue(k,v) = Smaps(k,v)*exp(1i*phi(v)).)
+Zm = Zm - mean(Zm, 1);
 C  = (Zm * Zm') / size(Zm, 2);        % (T x T) Hermitian covariance
 [U, d] = eig(C, 'vector');
 [d, idx] = sort(real(d), 'descend'); U = U(:, idx);
@@ -42,8 +61,10 @@ Xr = (U(:, 1:N)' ./ sqrt(d(1:N))) * Zm;    % (N x Vm) whitened mixture
 assert(isequal(size(icasig), [N, size(Xr, 2)]), 'icasig must be N x Vm');
 
 % recovery: each estimated source matches one true source (over masked voxels)
-% up to permutation + complex scale/phase
-Strue = S(:, mask);                                          % (N x Vm)
+% up to permutation + complex scale/phase. The sources ICA actually sees are the real
+% maps carrying the voxel's static phase; noise voxels are not part of the signal model.
+StrueFull = [Smaps .* repmat(exp(1i*phi), N, 1), zeros(N, Vnoise)];   % (N x V)
+Strue = StrueFull(:, mask);                                  % (N x Vm)
 corrM = abs(icasig * Strue') ./ ...
         (sqrt(sum(abs(icasig).^2, 2)) * sqrt(sum(abs(Strue).^2, 2))');
 corrM = corrM ./ max(corrM, [], 2);
