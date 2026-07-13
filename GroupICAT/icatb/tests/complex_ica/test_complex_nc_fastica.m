@@ -2,8 +2,12 @@ function test_complex_nc_fastica()
 addpath(genpath(fullfile(fileparts(mfilename('fullpath')), '..', '..', 'icatb_analysis_functions', 'icatb_algorithms', 'complex_ica')));
 rng(7);
 N = 4; T = 3000;
-% noncircular complex sources: unequal real/imag variance
-S = (randn(N,T) + 1i*0.3*randn(N,T));
+% Sources must be non-Gaussian AND noncircular: nc-FastICA maximizes non-Gaussianity (so
+% Gaussian sources are unseparable, whatever their circularity) and additionally exploits
+% noncircularity. Super-Gaussian real/imag parts with unequal variance give both.
+S = (randn(N,T) .* abs(randn(N,T)).^1.5) + 1i*0.3*(randn(N,T) .* abs(randn(N,T)).^1.5);
+S = S - mean(S, 2);
+S = sqrt(T) * S ./ sqrt(sum(abs(S).^2, 2));
 A = randn(N,N) + 1i*randn(N,N);
 X = A*S;
 W = icatb_complex_nc_fastica(X, 'log');

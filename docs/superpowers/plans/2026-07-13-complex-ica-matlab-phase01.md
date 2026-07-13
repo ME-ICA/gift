@@ -56,7 +56,14 @@ function test_complex_ica_ebm()
 addpath(genpath(fullfile(fileparts(mfilename('fullpath')), '..', '..', 'icatb_analysis_functions', 'icatb_algorithms', 'complex_ica')));
 rng(42);
 N = 4; T = 2000;
-S = (randn(N,T) + 1i*randn(N,T));            % complex sources
+% Sources MUST be non-Gaussian: ICA cannot separate Gaussian sources (identifiability
+% limit -- after whitening, any rotation of Gaussian data is equally valid). ICA-EBM
+% maximizes non-Gaussianity, so it has nothing to exploit on Gaussian input. The vendored
+% demo1.m likewise drives CEBM with (strongly non-Gaussian) QAM sources.
+S = (randn(N,T) .* abs(randn(N,T)).^1.5) + 1i*(randn(N,T) .* abs(randn(N,T)).^1.5);
+% mirror demo1.m preprocessing: zero-mean + power normalization
+S = S - mean(S, 2);
+S = sqrt(T) * S ./ sqrt(sum(abs(S).^2, 2));
 A = randn(N,N) + 1i*randn(N,N);              % complex mixing
 X = A*S;
 W = icatb_complex_ica_ebm(X);
@@ -138,8 +145,12 @@ function test_complex_nc_fastica()
 addpath(genpath(fullfile(fileparts(mfilename('fullpath')), '..', '..', 'icatb_analysis_functions', 'icatb_algorithms', 'complex_ica')));
 rng(7);
 N = 4; T = 3000;
-% noncircular complex sources: unequal real/imag variance
-S = (randn(N,T) + 1i*0.3*randn(N,T));
+% Sources must be non-Gaussian AND noncircular: nc-FastICA maximizes non-Gaussianity (so
+% Gaussian sources are unseparable, whatever their circularity) and additionally exploits
+% noncircularity. Super-Gaussian real/imag parts with unequal variance give both.
+S = (randn(N,T) .* abs(randn(N,T)).^1.5) + 1i*0.3*(randn(N,T) .* abs(randn(N,T)).^1.5);
+S = S - mean(S, 2);
+S = sqrt(T) * S ./ sqrt(sum(abs(S).^2, 2));
 A = randn(N,N) + 1i*randn(N,N);
 X = A*S;
 W = icatb_complex_nc_fastica(X, 'log');
