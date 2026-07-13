@@ -145,7 +145,23 @@ if strcmpi(maskType, 'default')
     else
         nonZeroInd = ones(prod(fMRIHInfo.DIM), 1);
     end
-    
+
+    %% Complex phase-quality mask (intersect with magnitude mask)
+    if (strcmpi(dataType, 'complex'))
+        % Reassemble full complex time series per file to score temporal phase stability.
+        Zc = [];
+        for i = 1:length(files)
+            tempF = icatb_rename_4d_file(files(i).name);
+            for nn = 1:size(tempF, 1)
+                zc = icatb_loadData(tempF, dataType, complexInfo, 'read', nn);
+                Zc = [Zc, zc(:)]; %#ok<AGROW>
+            end
+        end
+        magMask = logical(nonZeroInd(:));
+        pmask = icatb_complex_phase_mask(Zc, magMask);
+        nonZeroInd = nonZeroInd & pmask;
+    end
+
 else
     
     %% Calculate non-zero indices for selected mask
