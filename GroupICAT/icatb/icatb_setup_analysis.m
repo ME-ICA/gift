@@ -617,7 +617,10 @@ try
     
     % store these fields regarding dataType, complex naming
     dataType = 'real'; read_complex_images = 'real&imaginary'; write_complex_images = 'real&imaginary';
-    
+    if (isfield(sesInfo.userInput, 'dataType') && ~isempty(sesInfo.userInput.dataType))
+        dataType = sesInfo.userInput.dataType;
+    end
+
     sesInfo.userInput.dataType = lower(dataType);
     sesInfo.userInput.read_complex_images = lower(read_complex_images);
     sesInfo.userInput.write_complex_images = lower(write_complex_images);
@@ -1352,7 +1355,7 @@ try
     oldDir = sesInfo.userInput.pwd;
     
     % By default the data type is real
-    if ~isfield(sesInfo.userInput, 'dataType')
+    if (~isfield(sesInfo.userInput, 'dataType') || isempty(sesInfo.userInput.dataType))
         sesInfo.userInput.dataType = 'real';
     end
     

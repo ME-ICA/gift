@@ -218,6 +218,15 @@ sesInfo.userInput.pwd = outputDir;
 
 % store these fields regarding dataType, complex naming
 dataType = 'real'; read_complex_images = 'real&imaginary'; write_complex_images = 'real&imaginary';
+if (isfield(inputData, 'dataType') && ~isempty(inputData.dataType))
+    dataType = inputData.dataType;
+end
+if (isfield(inputData, 'read_complex_images') && ~isempty(inputData.read_complex_images))
+    read_complex_images = inputData.read_complex_images;
+end
+if (isfield(inputData, 'write_complex_images') && ~isempty(inputData.write_complex_images))
+    write_complex_images = inputData.write_complex_images;
+end
 
 sesInfo.userInput.param_file = [sesInfo.userInput.prefix, PARAMETER_INFO_MAT_FILE, '.mat'];
 sesInfo.userInput.param_file = fullfile(outputDir, sesInfo.userInput.param_file);
