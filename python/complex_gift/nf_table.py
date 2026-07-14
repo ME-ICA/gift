@@ -30,7 +30,12 @@ class PP:
 
 @dataclass(frozen=True)
 class NF:
-    """One entropy-bound nonlinearity: scalars + its spline and the spline's slope."""
+    """One entropy-bound nonlinearity: scalars + its spline and the spline's slope.
+
+    Note: `critical_point2` is present only on `nf1` in the source table and is
+    `NaN` for `nf2`–`nf8` by design of the source MATLAB struct. This field is
+    unused by the algorithm and is inert legacy metadata.
+    """
 
     min_EGx: float
     max_EGx: float
@@ -109,21 +114,15 @@ def simplified_ppval(pp: PP, xs: float) -> float:
 
 def export_nf_table(mat_path, npz_path) -> None:
     """Write the language-neutral canonical export consumed by the Rust port."""
-    d = loadmat(mat_path, squeeze_me=True, struct_as_record=False)
+    nf = load_nf_table(mat_path)
     flat = {}
-    for name in _NF_NAMES:
-        m = d[name]
-        flat[f"{name}/min_EGx"] = np.float64(m.min_EGx)
-        flat[f"{name}/max_EGx"] = np.float64(m.max_EGx)
-        flat[f"{name}/critical_point"] = np.float64(m.critical_point)
-        # Only export critical_point2 if it exists in the source
-        if hasattr(m, 'critical_point2'):
-            flat[f"{name}/critical_point2"] = np.float64(m.critical_point2)
-        else:
-            flat[f"{name}/critical_point2"] = np.float64(np.nan)
+    for name, v in nf.items():
+        flat[f"{name}/min_EGx"] = np.float64(v.min_EGx)
+        flat[f"{name}/max_EGx"] = np.float64(v.max_EGx)
+        flat[f"{name}/critical_point"] = np.float64(v.critical_point)
+        flat[f"{name}/critical_point2"] = np.float64(v.critical_point2)
         for attr in ("pp", "pp_slope"):
-            pp = getattr(m, attr)
-            pp_obj = _to_pp(pp)
-            flat[f"{name}/{attr}/breaks"] = pp_obj.breaks
-            flat[f"{name}/{attr}/coefs"] = pp_obj.coefs
+            pp = getattr(v, attr)
+            flat[f"{name}/{attr}/breaks"] = pp.breaks
+            flat[f"{name}/{attr}/coefs"] = pp.coefs
     np.savez(npz_path, **flat)
