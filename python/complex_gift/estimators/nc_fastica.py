@@ -46,11 +46,16 @@ def _g_gp(nonlinearity, absy):
     return g, gp
 
 
-def nc_fastica(X, nonlinearity="log", tol=1e-5, max_iter=50):
+def nc_fastica(X, nonlinearity="log", tol=1e-5, max_iter=None):
     """Noncircular complex FastICA, symmetric orthogonalization.
 
     X: (N, T) complex mixtures. Fully deterministic (the reference has no
     rand/randn calls). Returns an EstimatorResult with S = W @ X.
+
+    max_iter: maximum iterations. If None (default), uses the reference's
+    effective cap of 15*n (where n is the number of components). The MATLAB
+    reference assigns maxcounter=50 but never uses it; the actual loop bound
+    is 15*n. Passing an explicit integer overrides this behavior.
     """
     if nonlinearity not in _NONLINEARITIES:
         raise ValueError(
@@ -59,6 +64,10 @@ def nc_fastica(X, nonlinearity="log", tol=1e-5, max_iter=50):
 
     xold = np.asarray(X, dtype=np.complex128)
     n, m = xold.shape
+
+    # Resolve max_iter: default to 15*n to match the MATLAB reference's effective cap.
+    if max_iter is None:
+        max_iter = 15 * n
 
     # Whitening: eig(cov(xold')) in MATLAB. MATLAB's cov() computes the
     # CONJUGATE (Hermitian) covariance with N-1 normalization; np.cov matches
@@ -76,10 +85,8 @@ def nc_fastica(X, nonlinearity="log", tol=1e-5, max_iter=50):
     Wold = np.zeros((n, n), dtype=np.complex128)
     k = 0
 
-    # NOTE: the MATLAB reference bounds this loop with the literal `15*n`
-    # (its `maxcounter=50` local is dead code, never referenced). Since
-    # `max_iter` is now a real, user-facing parameter, we honor it as the
-    # actual iteration cap rather than reproducing the dead-code literal.
+    # Convergence condition: loop while orthonormality deviation exceeds threshold
+    # AND iteration count is within the limit (max_iter, which defaults to 15*n).
     while (
         np.linalg.norm(np.abs(Wold.conj().T @ W) - np.eye(n), "fro") > (n * tol)
         and k < max_iter
