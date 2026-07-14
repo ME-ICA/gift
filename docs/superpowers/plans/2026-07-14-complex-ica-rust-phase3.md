@@ -941,19 +941,33 @@ fn quality_map_is_invariant_to_a_constant_per_voxel_phase() {
 }
 
 #[test]
-fn otsu_separates_two_well_separated_modes() {
+fn otsu_discriminates_two_well_separated_modes() {
     let mut x = Vec::new();
     for i in 0..500 {
-        x.push(0.10 + 0.001 * (i % 20) as f64);
+        x.push(0.10 + 0.001 * (i % 20) as f64); // lower mode, mean ~0.1095
     }
     for i in 0..500 {
-        x.push(0.90 + 0.001 * (i % 20) as f64);
+        x.push(0.90 + 0.001 * (i % 20) as f64); // upper mode, mean ~0.9095
     }
     let tau = otsu_threshold(&x);
-    // Otsu's objective is flat across the empty gap, so argmax may land anywhere in it -
-    // assert the functional property (it separates the modes), not a tie-break location.
-    assert!(x[..500].iter().filter(|&&v| v < tau).count() >= 495);
-    assert!(x[500..].iter().filter(|&&v| v > tau).count() >= 495);
+
+    // This is a HISTOGRAM method (256 bins) returning a BIN CENTRE. With a clean bimodal
+    // input the between-class variance is FLAT from the lower mode's bin across the whole
+    // empty gap, and argmax takes the FIRST maximiser - so tau is the centre of a bin that
+    // can sit INSIDE the lower mode. Not a bug: skimage's threshold_otsu returns the
+    // identical value on this input, and the parity test above pins Rust to Python at
+    // 1.7e-16. A binned Otsu cannot promise "the whole lower mode is below tau"; assert
+    // what it does promise - the threshold discriminates the two modes.
+    let mean_lo = x[..500].iter().sum::<f64>() / 500.0;
+    let mean_hi = x[500..].iter().sum::<f64>() / 500.0;
+    assert!(
+        mean_lo < tau && tau < mean_hi,
+        "tau={tau} must fall between the modes ({mean_lo} .. {mean_hi})"
+    );
+    assert!(
+        x[500..].iter().all(|&v| v > tau),
+        "the entire upper mode must lie above tau"
+    );
 }
 ```
 
