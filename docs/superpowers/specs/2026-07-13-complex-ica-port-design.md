@@ -26,7 +26,7 @@ complex ICA algorithms).
 | Decision | Choice | Rationale |
 |---|---|---|
 | **Port scope** | Complex ICA + *minimal runnable GIFT* | Ports run a full complex **group** analysis end-to-end (data reduction → complex ICA → back-recon → NIfTI outputs). **Excluded:** GUI, dFNC/dFC, MANCOVA, display/rendering, real-valued ICA. |
-| **Estimators** | **CEBM + nc-FastICA**, behind a swappable interface | Two independent estimators cross-check the pipeline; exercises **both** whitening paths (Hermitian for CEBM, SUT/pseudo-cov for nc-FastICA). |
+| **Estimators** | **CEBM + nc-FastICA**, behind a swappable interface | Two independent estimators cross-check the pipeline. (Both whiten internally; see the correction under §4 — neither uses the SUT.) |
 | **Sequencing** | **MATLAB → Python → Rust** | Each stage is the numeric oracle for the next; lowest risk. |
 | **Phase-step validation** | Property-based + synthetic-injection, identical assertions in all three targets | The phase steps have no reference implementation to diff against; prove properties instead. |
 | **Group scheme** | GIFT default: temporal concatenation → two-stage (subject then group) complex PCA → GICA back-reconstruction | Keeps "minimal runnable" faithful to GIFT without pulling in other back-recon variants. |
@@ -68,8 +68,18 @@ defined interface.
 | `group` | per-subject reduced data → group W, back-recon | two-stage complex PCA + GICA back-recon + align (ref §7b, §9) |
 | `nf_table` | — | loaded from shared CSV/npy export (ref §12.0) |
 
-**Only coupling between units:** the estimator selector also picks the whitening path —
-`cebm` ⇒ Hermitian whitening + `nf_table`; `nc_fastica` ⇒ SUT whitening, no table.
+**Correction (established during Phase 2 — the original claim here was wrong):** this spec
+originally stated that the estimator selector picks the whitening path, with
+`nc_fastica` ⇒ SUT whitening. That is **not** what the reference implementations do. Both
+estimators perform their **own internal** whitening: `cebm` whitens via `pre_processing`
+(Hermitian covariance) and separately forms the pseudo-covariance itself; `nc_fastica`
+likewise whitens with the Hermitian covariance and carries an explicit pseudo-covariance
+term in its fixed-point update. Neither calls the Strong Uncorrelating Transform.
+
+So the units are in fact **fully decoupled**: `whiten` is used by the *group reduction*
+(`two_stage_pca`), not by the estimators. `strong_uncorrelating_transform` is retained as a
+correct, tested, degeneracy-safe public utility for noncircular work, but **no estimator
+currently calls it** — do not assume it is on the hot path.
 Everything else is a clean data hand-off.
 
 ## 5. Track 1 — MATLAB-in-GIFT (the oracle)
