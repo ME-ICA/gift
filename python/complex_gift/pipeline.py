@@ -47,7 +47,11 @@ def run_complex_ica(subject_data, n_components, estimator="cebm", mag_mask=None,
     # 5. back-reconstruct per subject, then align each to the group reference
     subjects = []
     for S_i, A_i in back_reconstruct(S_group, A_group, reduced, whiteners, W_group):
-        S_i, _ = align_to_reference(S_i, S_group)
+        S_i, theta_i = align_to_reference(S_i, S_group)
+        # Counter-rotate A_i so the returned pair still satisfies X_i ~= A_i @ S_i:
+        # A_i is (T_i, N) with components as columns, so each column k must be rotated
+        # by the inverse of the phase applied to S_i's row k.
+        A_i = A_i * np.exp(-1j * theta_i)[None, :]
         subjects.append((S_i, A_i))
 
     return PipelineResult(S_group=S_group, A_group=A_group, mask=mask, subjects=subjects)

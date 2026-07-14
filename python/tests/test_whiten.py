@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from complex_gift.whiten import strong_uncorrelating_transform, whiten_hermitian
 
@@ -26,6 +27,27 @@ def test_dewhitening_reconstructs_signal_subspace():
     Xw, W_wh, W_dw = whiten_hermitian(X, n_components=N)
     # data is exactly rank N, so dewhitening must reconstruct it
     assert np.allclose(W_dw @ Xw, Xc, atol=1e-6)
+
+
+def test_raises_when_more_components_than_rows():
+    rng = np.random.default_rng(4)
+    P, T = 5, 500
+    X = rng.standard_normal((P, T)) + 1j * rng.standard_normal((P, T))
+    with pytest.raises(ValueError):
+        whiten_hermitian(X, n_components=12)
+
+
+def test_raises_on_rank_deficient_input():
+    # Build 6 rows that are exact linear combinations of 3 independent complex rows,
+    # so the true rank of X is 3 regardless of T. Requesting more components than the
+    # rank must raise rather than silently emit NaNs from sqrt of a ~0 eigenvalue.
+    rng = np.random.default_rng(5)
+    T = 500
+    base = rng.standard_normal((3, T)) + 1j * rng.standard_normal((3, T))
+    mix = rng.standard_normal((6, 3)) + 1j * rng.standard_normal((6, 3))
+    X = mix @ base                      # (6, T), exactly rank 3
+    with pytest.raises(ValueError):
+        whiten_hermitian(X, n_components=4)
 
 
 def test_sut_diagonalizes_covariance_and_pseudo_covariance():

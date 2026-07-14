@@ -20,12 +20,27 @@ def whiten_hermitian(X, n_components=None):
     P, T = X.shape
     N = P if n_components is None else int(n_components)
 
+    if N > P:
+        raise ValueError(
+            f"whiten_hermitian: requested n_components={N} exceeds the number of "
+            f"input rows P={P}; cannot whiten to more components than input dimensions."
+        )
+
     Xc = X - X.mean(axis=1, keepdims=True)
     R = Xc @ Xc.conj().T / T                # (P, P) Hermitian; note conjugate transpose
     d, U = np.linalg.eigh(R)                # ascending, real eigenvalues
     order = np.argsort(d)[::-1][:N]         # descending, keep top N
     d = d[order].real
     U = U[:, order]
+
+    d_max = d.max() if d.size else 0.0
+    if np.any(d <= 1e-12 * d_max):
+        raise ValueError(
+            f"whiten_hermitian: data is rank-deficient at the requested model order "
+            f"n_components={N} (smallest retained eigenvalue {d.min():.3g} is not "
+            f"comfortably positive relative to the largest {d_max:.3g}); refusing to "
+            "return a silently NaN-contaminated result."
+        )
 
     s = np.sqrt(d)
     W_whiten = (U.conj().T) / s[:, None]    # (N, P)
