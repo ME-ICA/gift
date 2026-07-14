@@ -1,7 +1,9 @@
 from .base import Estimator, EstimatorResult
+from .cebm import cebm
 from .nc_fastica import nc_fastica
 
 ESTIMATORS = {
+    "cebm": cebm,
     "nc-fastica": nc_fastica,
 }
 
@@ -16,4 +18,11 @@ def get_estimator(name):
         ) from None
 
 
-__all__ = ["ESTIMATORS", "Estimator", "EstimatorResult", "get_estimator", "nc_fastica"]
+__all__ = [
+    "ESTIMATORS",
+    "Estimator",
+    "EstimatorResult",
+    "cebm",
+    "get_estimator",
+    "nc_fastica",
+]
