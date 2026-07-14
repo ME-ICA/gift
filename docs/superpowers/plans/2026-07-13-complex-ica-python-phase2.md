@@ -1114,8 +1114,14 @@ Create `python/complex_gift/estimators/nc_fastica.py` as a faithful translation 
 
 - GPL v3 header naming the source file and citing Novey & Adali (2008), *On extending
   the complex FastICA algorithm to noncircular sources*, IEEE TSP 56(5):2148-2154.
-- Signature `nc_fastica(X, nonlinearity="log", tol=1e-5, max_iter=50) -> EstimatorResult`,
-  with the reference's constants (`tol=1e-5`, `a2=0.05`, `maxcounter=50`).
+- Signature `nc_fastica(X, nonlinearity="log", tol=1e-5, max_iter=None) -> EstimatorResult`.
+  **Careful:** the reference's `tol = 1e-5` and `maxcounter = 50` locals are DEAD CODE —
+  assigned and never read. Its real loop condition (line 60) is
+  `while (norm(abs(Wold'*W)-eye(n),'fro') > (n*1e-5) && k < 15*n)`, so the effective
+  threshold is `n*tol` (which `tol=1e-5` reproduces) and the effective iteration cap is
+  **`15*n`, not 50**. `max_iter=None` must therefore resolve to `15*n`; hard-coding 50
+  would silently stop up to 3x earlier than the reference for realistic component counts.
+  (`a2 = 0.05` is live and is used.)
 - Keep the reference's structure: whiten via `eig` of the covariance, form the
   pseudo-covariance `pC = (x @ x.T) / m`, run the deflationary fixed-point updates for
   each of the three nonlinearities (`log`, `kurt`, `sqrt`), then symmetric
