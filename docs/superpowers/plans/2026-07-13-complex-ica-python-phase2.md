@@ -720,7 +720,12 @@ def test_otsu_splits_a_bimodal_distribution():
     rng = np.random.default_rng(4)
     x = np.concatenate([rng.normal(0.1, 0.02, 500), rng.normal(0.9, 0.02, 500)])
     tau = otsu_threshold(x)
-    assert 0.2 < tau < 0.8
+    # Otsu's between-class variance is FLAT across the empty gap between two
+    # well-separated modes (moving the threshold there reclassifies no points), so
+    # argmax legitimately lands anywhere in the gap - pinning tau to a sub-range would
+    # only test a tie-breaking detail. Assert what actually matters: it separates them.
+    assert (x[:500] < tau).mean() > 0.99
+    assert (x[500:] > tau).mean() > 0.99
 ```
 
 - [ ] **Step 2: Run to verify it fails**
