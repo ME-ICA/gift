@@ -568,22 +568,34 @@ pub struct Nf {
     pub pp_slope: Pp,
 }
 
-fn read_npy_f64(path: &Path) -> (Vec<f64>, Vec<usize>) {
+fn read_npy_f64(path: &Path) -> (Vec<f64>, Vec<usize>, npyz::Order) {
     let bytes = std::fs::read(path)
         .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
     let npy = npyz::NpyFile::new(&bytes[..]).expect("valid .npy");
     let shape: Vec<usize> = npy.shape().iter().map(|&d| d as usize).collect();
-    (npy.into_vec::<f64>().expect("f64 payload"), shape)
+    let order = npy.order();
+    (npy.into_vec::<f64>().expect("f64 payload"), shape, order)
 }
 
 fn load_pp(dir: &Path, name: &str, which: &str) -> Pp {
-    let (breaks, _) = read_npy_f64(&dir.join(format!("{name}_{which}_breaks.npy")));
-    let (flat, shape) = read_npy_f64(&dir.join(format!("{name}_{which}_coefs.npy")));
+    let (breaks, _, _) = read_npy_f64(&dir.join(format!("{name}_{which}_breaks.npy")));
+    let (flat, shape, order) = read_npy_f64(&dir.join(format!("{name}_{which}_coefs.npy")));
     let pieces = shape[0];
     assert_eq!(shape[1], 4, "{name}_{which}: expected order-4 coefficients");
-    // numpy is row-major: row i is coefs[i*4 .. i*4+4]
+    // MEMORY ORDER: these tables came through scipy.io.loadmat, so they are stored
+    // FORTRAN-order (column-major) - element (i, j) of a (pieces, 4) array lives at
+    // flat[j * pieces + i], NOT flat[i * 4 + j]. Assuming row-major here silently yields
+    // garbage coefficients (no error - just a wrong spline). Dispatch on the header flag.
     let coefs = (0..pieces)
-        .map(|i| [flat[i * 4], flat[i * 4 + 1], flat[i * 4 + 2], flat[i * 4 + 3]])
+        .map(|i| match order {
+            npyz::Order::C => [flat[i * 4], flat[i * 4 + 1], flat[i * 4 + 2], flat[i * 4 + 3]],
+            npyz::Order::Fortran => [
+                flat[i],
+                flat[pieces + i],
+                flat[2 * pieces + i],
+                flat[3 * pieces + i],
+            ],
+        })
         .collect();
     Pp { breaks, coefs, pieces }
 }
@@ -591,7 +603,7 @@ fn load_pp(dir: &Path, name: &str, which: &str) -> Pp {
 pub fn load_nf_table(dir: &Path) -> [Nf; 8] {
     std::array::from_fn(|i| {
         let name = format!("nf{}", i + 1);
-        let (s, _) = read_npy_f64(&dir.join(format!("{name}_scalars.npy")));
+        let (s, _, _) = read_npy_f64(&dir.join(format!("{name}_scalars.npy")));
         Nf {
             min_egx: s[0],
             max_egx: s[1],
