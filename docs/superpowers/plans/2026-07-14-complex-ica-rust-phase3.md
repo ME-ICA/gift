@@ -303,39 +303,52 @@ pub fn fixtures_dir() -> PathBuf {
         .join("npy")
 }
 
-fn read_npy<T: npyz::Deserialize>(name: &str) -> (Vec<T>, Vec<usize>) {
+fn read_npy<T: npyz::Deserialize>(name: &str) -> (Vec<T>, Vec<usize>, npyz::Order) {
     let path = fixtures_dir().join(format!("{name}.npy"));
     let bytes = std::fs::read(&path)
         .unwrap_or_else(|e| panic!("cannot read fixture {}: {e}", path.display()));
     let npy = npyz::NpyFile::new(&bytes[..]).expect("valid .npy");
     let shape: Vec<usize> = npy.shape().iter().map(|&d| d as usize).collect();
+    let order = npy.order();
     let data: Vec<T> = npy.into_vec().expect("npy payload");
-    (data, shape)
+    (data, shape, order)
 }
 
-/// numpy writes C-order (row-major); nalgebra's `from_vec` reads column-major. Feeding a
-/// row-major buffer straight in silently TRANSPOSES the matrix - so build row-major
-/// explicitly. A 1-D array becomes a (1, n) row.
+/// numpy's `.npy` header carries an explicit `fortran_order` flag, and `into_vec()` returns
+/// the bytes IN THE ORDER THEY ARE STORED - it does NOT normalise to C-order.
+///
+/// Do not assume C-order! Arrays that came through `scipy.io.loadmat` keep MATLAB's
+/// column-major layout, so `np.save` writes them with `fortran_order: True` (this covers
+/// cS/A/cX, the oracle W matrices, AND every nf*_coefs table). Arrays constructed fresh in
+/// numpy are C-order.
+///
+/// nalgebra's `from_column_slice` reads column-major and `from_row_slice` reads row-major.
+/// Guessing wrong SILENTLY TRANSPOSES the matrix - no error, just wrong numbers everywhere
+/// downstream. Dispatch on the flag. A 1-D array becomes a (1, n) row (order is irrelevant).
 fn to_matrix<T: nalgebra::Scalar + Copy + num_traits::Zero>(
     data: Vec<T>,
     shape: Vec<usize>,
+    order: npyz::Order,
 ) -> DMatrix<T> {
     let (r, c) = match shape.len() {
         1 => (1usize, shape[0]),
         2 => (shape[0], shape[1]),
         n => panic!("expected a 1-D or 2-D fixture, got {n} dims"),
     };
-    DMatrix::from_row_slice(r, c, &data)
+    match order {
+        npyz::Order::C => DMatrix::from_row_slice(r, c, &data),
+        npyz::Order::Fortran => DMatrix::from_column_slice(r, c, &data),
+    }
 }
 
 pub fn load_c64(name: &str) -> DMatrix<Complex64> {
-    let (data, shape) = read_npy::<Complex64>(name);
-    to_matrix(data, shape)
+    let (data, shape, order) = read_npy::<Complex64>(name);
+    to_matrix(data, shape, order)
 }
 
 pub fn load_f64(name: &str) -> DMatrix<f64> {
-    let (data, shape) = read_npy::<f64>(name);
-    to_matrix(data, shape)
+    let (data, shape, order) = read_npy::<f64>(name);
+    to_matrix(data, shape, order)
 }
 
 pub fn load_u8(name: &str) -> Vec<u8> {
@@ -2710,6 +2723,6 @@ git commit -m "feat(rust): file-level driver (complex NIfTI in -> component maps
 - **Everything runs with plain `cargo`:** `cd rust && cargo test`. There is no LAPACK on this machine — `nalgebra` is pure Rust and needs no system libraries. Do NOT add `ndarray-linalg`; it cannot link here.
 - **ICA cannot separate Gaussian sources.** Every source-recovery test must use non-Gaussian (super-Gaussian) sources. This is an identifiability limit, not a tuning problem — it has already cost a debugging cycle in an earlier phase.
 - **Know what is comparable.** See the table in Global Constraints. Anything downstream of an eigendecomposition (whitening, both estimators, the group reduction) does NOT match Python elementwise — compare invariants or ISI. Anything that is pure arithmetic (ppval, Q, phase correction, back-reconstruction from fixed inputs) DOES — compare elementwise at 1e-10.
-- **numpy is row-major; nalgebra is column-major.** The fixture loader builds matrices with `from_row_slice`. Getting this wrong silently transposes every fixture.
+- **Memory order is a live trap.** `.npy` carries a `fortran_order` flag and npyz returns bytes as stored. Arrays that came through `scipy.io.loadmat` are **column-major** (cS/A/cX, the oracle W matrices, every nf*_coefs table); arrays built fresh in numpy are row-major. The loader dispatches on the flag. Guessing silently transposes the fixture - no error, just wrong numbers.
 - **Tasks 6 and 7 are translations** of already-validated Python, not fresh algorithm design. Read the Python (and the MATLAB it came from) completely before writing Rust; the tests are the executable specification.
 - **The fixtures are read-only.** If a test seems to want different fixture data, the test is wrong.
