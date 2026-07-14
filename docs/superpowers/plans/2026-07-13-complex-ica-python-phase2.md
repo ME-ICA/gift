@@ -1536,8 +1536,16 @@ def test_end_to_end_group_complex_ica():
     assert res.mask[:Vsig].mean() > 0.9
     assert res.mask[Vsig:].mean() < 0.05
 
-    # the group decomposition recovered the true maps (up to permutation/phase)
-    Strue = (Smaps * np.exp(1j * phi)[None, :])[:, res.mask[:Vsig]]
+    # The group decomposition recovered the true maps (up to permutation/phase).
+    # Build the ground truth over ALL voxels (noise voxels carry no signal, hence zeros)
+    # and then apply the SAME mask the pipeline used. The mask is allowed to leak a few
+    # noise voxels (the assertion above only bounds leakage at <5%), so indexing the
+    # signal block alone would produce a shape mismatch the moment one leaks through.
+    StrueFull = np.concatenate(
+        [Smaps * np.exp(1j * phi)[None, :], np.zeros((N, Vnoise), dtype=np.complex128)],
+        axis=1,
+    )                                                        # (N, V)
+    Strue = StrueFull[:, res.mask]                           # (N, V_masked)
     perm, corr = match_sources(res.S_group, Strue)
     assert len(set(perm)) == N
     assert np.all(corr > 0.8)
@@ -1587,6 +1595,19 @@ def two_stage_pca(subject_data, n_subject, n_group):
     reduced, whiteners = [], []
     for Xi in subject_data:
         Xi = np.asarray(Xi, dtype=np.complex128)                    # (T_i, V)
+        # Remove the per-VOXEL TEMPORAL mean: this strips the static complex baseline
+        # image (the anatomy / B0 background), which is constant over time and would
+        # otherwise appear as a huge rank-1 nuisance direction and consume one of the
+        # n_subject PCA slots, silently discarding a real source.
+        #
+        # Note `whiten_hermitian` internally removes the mean along its own axis=1,
+        # which here is the VOXEL axis (a per-timepoint spatial de-mean) - a different
+        # thing entirely. It does NOT remove the static baseline. Both are needed.
+        #
+        # This must happen AFTER the phase-quality mask, never before: the mask keys on
+        # each voxel's phase being stable over time, and the dominant static baseline is
+        # exactly what makes it stable.
+        Xi = Xi - Xi.mean(axis=0, keepdims=True)                    # per-voxel temporal mean
         Yi, W_i, _ = whiten_hermitian(Xi, n_components=n_subject)   # (n_subject, V)
         reduced.append(Yi)
         whiteners.append(W_i)
