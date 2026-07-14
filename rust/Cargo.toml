@@ -1,0 +1,20 @@
+[package]
+name = "complex-gift"
+version = "0.1.0"
+edition = "2021"
+description = "Complex-valued fMRI ICA - Rust port of GIFT's complex ICA pipeline"
+license = "GPL-3.0-or-later"
+
+[lib]
+name = "complex_gift"
+path = "src/lib.rs"
+
+[dependencies]
+nalgebra = "0.34"
+num-complex = "0.4"
+nifti = "0.17"
+ndarray = "0.16"          # the nifti crate exchanges volumes as ndarray arrays
+npyz = { version = "0.8", features = ["complex"] }   # reads the .npy lookup tables
+
+[dev-dependencies]
+num-traits = "0.2"
