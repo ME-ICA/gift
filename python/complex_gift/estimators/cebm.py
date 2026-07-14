@@ -54,6 +54,16 @@ _K_REAL = 8
 _USED = (1, 3, 5, 7)  # 1-based nonlinearity indices, as in the MATLAB
 
 
+def _pseudo_cov(X):
+    """Pseudo-covariance E[x x^T] -- PLAIN transpose, NOT the conjugate transpose.
+
+    MATLAB: C = Xc*Xc.'/T  (`.'` is the plain transpose). This is the quantity that
+    carries the noncircularity CEBM exploits; using `.conj().T` here silently
+    destroys it while still appearing to work.
+    """
+    return X @ X.T / X.shape[1]
+
+
 def _inv_sqrtm_h(B):
     """Inverse matrix square root of a Hermitian matrix (MATLAB ``inv_sqrtmH``)."""
     d, V = np.linalg.eigh(B)
@@ -169,7 +179,7 @@ def _sea(Xc, nf, rng, tolerance, maxiter_sea=100, max_cost_increase_number=10):
     best_W = W.copy()
 
     # PLAIN transpose: C is the PSEUDO-covariance (CEBM:59). Not the covariance.
-    C = Xc @ Xc.T / T
+    C = _pseudo_cov(Xc)
 
     min_cost = np.inf
     cost_increase_counter = 0
@@ -221,7 +231,7 @@ def _north(X, W0, max_iter_north, mu0_north, max_cost_increase_number,
     is unreachable from ``CEBM`` and is not ported.
     """
     N, T = X.shape
-    R_xxt = X @ X.T / T  # PLAIN transpose: pseudo-covariance of the whitened data
+    R_xxt = _pseudo_cov(X)  # PLAIN transpose: pseudo-covariance of the whitened data
 
     cost_increase_counter = 0
     mu = mu0_north
