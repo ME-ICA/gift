@@ -347,7 +347,12 @@ class PP:
 
 @dataclass(frozen=True)
 class NF:
-    """One entropy-bound nonlinearity: scalars + its spline and the spline's slope."""
+    """One entropy-bound nonlinearity: scalars + its spline and the spline's slope.
+
+    NOTE: `critical_point2` is present only on nf1 in the source table; it is NaN for
+    nf2-nf8 by design. It is inert legacy metadata - the reference complex_ICA_EBM.m
+    never reads it. Do not treat the NaN as a loader bug.
+    """
 
     min_EGx: float
     max_EGx: float
@@ -376,7 +381,8 @@ def load_nf_table(path) -> dict[str, NF]:
             min_EGx=float(m.min_EGx),
             max_EGx=float(m.max_EGx),
             critical_point=float(m.critical_point),
-            critical_point2=float(m.critical_point2),
+            # only nf1 carries critical_point2; nf2-nf8 genuinely lack the field
+            critical_point2=float(getattr(m, "critical_point2", np.nan)),
             pp=_to_pp(m.pp),
             pp_slope=_to_pp(m.pp_slope),
         )
