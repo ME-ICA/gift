@@ -554,7 +554,6 @@ noncircular estimators such as nc-FastICA.
 """
 
 import numpy as np
-import scipy.linalg as sla
 
 
 def whiten_hermitian(X, n_components=None):
@@ -592,21 +591,48 @@ def strong_uncorrelating_transform(X):
     # 1. standard Hermitian whitening
     Xw, W_wh, _ = whiten_hermitian(Xc, n_components=N)
 
-    # 2. the whitened pseudo-covariance is complex symmetric; its Takagi
-    #    factorization P = U diag(k) U^T gives the rotation that diagonalizes it
-    #    while preserving E[xx^H] = I (U is unitary).
+    # 2. The whitened pseudo-covariance Pc is complex SYMMETRIC (not Hermitian). Its
+    #    Takagi factorization Pc = V diag(k) V.T (V unitary, k >= 0 real) gives the
+    #    rotation that diagonalizes Pc while preserving the whitened covariance
+    #    (any unitary does the latter).
+    #
+    #    From an SVD Pc = U S Vh, symmetry forces Z := U^H @ V_svd.conj() to commute
+    #    with diag(S). If the singular values are DISTINCT, Z is diagonal with
+    #    unit-modulus entries and V = U @ diag(sqrt(diag(Z))) works.
+    #
+    #    That shortcut is WRONG under degeneracy: with repeated (or several exactly
+    #    zero) singular values -- which is what several perfectly CIRCULAR components
+    #    produce, a realistic fMRI case -- Z is only block-diagonal, diag(Z) picks
+    #    non-unit-modulus entries, and V comes out measurably NON-unitary, silently
+    #    breaking BOTH invariants. Use the unitary SQUARE ROOT of Z instead: Z is
+    #    unitary (hence normal), so its eigendecomposition Z = Q diag(w) Q^-1 has
+    #    |w| == 1 and sqrtm(Z) is well-defined at any eigenvalue multiplicity.
     Pc = Xw @ Xw.T / T
-    # Takagi via SVD of a complex symmetric matrix: P = V S V^T
-    U_, S_, Vh_ = np.linalg.svd(Pc)
-    # for complex symmetric P, the Takagi vectors follow from a phase correction
-    Z = U_.conj().T @ np.conj(Vh_.conj().T)
-    w, Q = sla.schur(Z, output="complex")
-    phase = np.sqrt(np.diag(w))
-    V = U_ @ Q @ np.diag(phase)
+    U_, s_, Vh_ = np.linalg.svd(Pc)
+    V_svd = Vh_.conj().T
+    Z = U_.conj().T @ V_svd.conj()           # unitary; diagonal only if S has no repeats
+    w, Qz = np.linalg.eig(Z)
+    w = w / np.abs(w)                        # guard against roundoff drift off |w| == 1
+    sqrtZ = Qz @ np.diag(np.sqrt(w)) @ np.linalg.inv(Qz)
+    V = U_ @ sqrtZ                           # Takagi basis: Pc = V @ diag(s_) @ V.T
+
+    # Never return a silently wrong transform.
+    unitarity_err = np.abs(V.conj().T @ V - np.eye(N)).max()
+    if not np.isfinite(unitarity_err) or unitarity_err > 1e-6:
+        raise RuntimeError(
+            "strong_uncorrelating_transform: Takagi factor V failed the unitarity "
+            f"check (max |V^H V - I| = {unitarity_err:.3g} > 1e-6); "
+            "refusing to return a silently wrong transform."
+        )
+
     W_sut = V.conj().T @ W_wh
     Xs = W_sut @ Xc
     return Xs, W_sut
 ```
+
+> The degenerate case must be regression-tested (`test_sut_handles_degenerate_singular_values`).
+> Note that i.i.d. random circular sources do **not** reproduce it — their finite-sample
+> pseudo-covariance has generic singular values. Construct exact degeneracy deliberately.
 
 - [ ] **Step 4: Run to verify it passes**
 
