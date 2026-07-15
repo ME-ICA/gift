@@ -2,6 +2,7 @@
 //!
 //! GPL v3 - derives from the Adali-lab (MLSP/UMBC) complex ICA algorithms.
 
+pub mod estimators;
 pub mod nf_table;
 pub mod phase_correct;
 pub mod phase_mask;
