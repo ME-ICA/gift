@@ -96,6 +96,16 @@ def main():
     save("parity_align_S_ref", S_ref); save("parity_align_S_in", S_subj)
     save("parity_align_S_out", S_al); save("parity_align_theta", th_al)
 
+    # --- small NIfTI probe volumes for the Rust complex_io tests ---
+    import nibabel as nib
+    nii = FIX / "nifti"
+    nii.mkdir(parents=True, exist_ok=True)
+    dims = (4, 4, 2)
+    idx = np.arange(int(np.prod(dims)), dtype=np.float64).reshape(dims)
+    nib.save(nib.Nifti1Image(idx, np.eye(4)), str(nii / "R_probe.nii"))
+    nib.save(nib.Nifti1Image(-idx, np.eye(4)), str(nii / "I_probe.nii"))
+    print(f"  nifti/R_probe.nii, nifti/I_probe.nii {dims}")
+
     print(f"\nwrote fixtures to {OUT}")
 
 
