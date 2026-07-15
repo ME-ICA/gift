@@ -74,6 +74,13 @@ fn frob_diff(wold: &DMatrix<Complex64>, w: &DMatrix<Complex64>) -> f64 {
     acc.sqrt()
 }
 
+/// Resolve the iteration cap. MATLAB's `maxcounter = 50` is DEAD CODE; the reference's
+/// real loop bound is `15 * n` (see nonCircComplexFastICAsym.m line 60). `None` therefore
+/// resolves to `15 * n`, NOT 50.
+pub fn resolve_max_iter(max_iter: Option<usize>, n: usize) -> usize {
+    max_iter.unwrap_or(15 * n)
+}
+
 /// Noncircular complex FastICA, symmetric orthogonalization.
 ///
 /// `x`: (N, T) complex mixtures. Fully deterministic (the reference has no rand/randn
@@ -92,7 +99,7 @@ pub fn nc_fastica(
     let nonlin = NonLinearity::parse(nonlinearity)?;
 
     let (n, m) = x.shape();
-    let max_iter = max_iter.unwrap_or(15 * n);
+    let max_iter = resolve_max_iter(max_iter, n);
 
     // Whitening: eig(cov(xold')) in MATLAB. MATLAB's cov() computes the CONJUGATE
     // (Hermitian) covariance with N-1 normalization on the MEAN-CENTERED data; the

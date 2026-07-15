@@ -36,12 +36,14 @@ fn separates_the_shared_fixture_as_well_as_the_matlab_reference() {
 
 #[test]
 fn default_max_iter_is_the_reference_cap_of_15n() {
-    // MATLAB's `maxcounter = 50` is DEAD CODE; the real cap is 15*n. Guard the default so
-    // nobody "restores" 50 and silently stops up to 3x early for realistic model orders.
-    let cx = load_c64("cX"); // n = 6 -> 15*n = 90 != 50
-    let a = nc_fastica(&cx, "log", 1e-5, None).expect("default");
-    let b = nc_fastica(&cx, "log", 1e-5, Some(15 * cx.nrows())).expect("explicit 15n");
-    assert!((&a.w - &b.w).norm() < 1e-12, "default cap is not 15*n");
+    use complex_gift::estimators::nc_fastica::resolve_max_iter;
+    // MATLAB's maxcounter=50 is dead code; the real cap is 15*n. The shared fixture
+    // converges in ~16 iterations, so neither cap ever bites and comparing OUTPUTS
+    // cannot tell 50 from 90 - assert the resolution itself, which a regression to
+    // unwrap_or(50) would fail immediately.
+    assert_eq!(resolve_max_iter(None, 6), 90);
+    assert_eq!(resolve_max_iter(None, 4), 60);
+    assert_eq!(resolve_max_iter(Some(7), 6), 7);
 }
 
 #[test]
