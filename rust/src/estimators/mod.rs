@@ -1,5 +1,6 @@
 //! Complex ICA estimators. Each returns the same triple.
 
+pub mod cebm;
 pub mod nc_fastica;
 
 use nalgebra::DMatrix;
