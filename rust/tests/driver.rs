@@ -283,12 +283,14 @@ fn written_maps_inherit_the_input_geometry() {
     let mut rng = TestRng::new(9);
 
     // a deliberately NON-identity geometry: 2mm/3mm/4mm voxels, translated origin
-    let mut href = NiftiHeader::default();
-    href.pixdim = [1.0, 2.0, 3.0, 4.0, 0.0, 0.0, 0.0, 0.0];
-    href.sform_code = 1;
-    href.srow_x = [2.0, 0.0, 0.0, -10.0];
-    href.srow_y = [0.0, 3.0, 0.0, -20.0];
-    href.srow_z = [0.0, 0.0, 4.0, -30.0];
+    let href = NiftiHeader {
+        pixdim: [1.0, 2.0, 3.0, 4.0, 0.0, 0.0, 0.0, 0.0],
+        sform_code: 1,
+        srow_x: [2.0, 0.0, 0.0, -10.0],
+        srow_y: [0.0, 3.0, 0.0, -20.0],
+        srow_z: [0.0, 0.0, 4.0, -30.0],
+        ..Default::default()
+    };
 
     // phase-stable signal everywhere, so the mask keeps voxels and the pipeline runs
     let phi: Vec<f64> = (0..v).map(|_| (rng.uniform() * 20.0 - 10.0) / 180.0 * std::f64::consts::PI).collect();
@@ -297,10 +299,10 @@ fn written_maps_inherit_the_input_geometry() {
         let mut re = ndarray::Array4::<f64>::zeros((dims[0], dims[1], dims[2], t));
         let mut im = ndarray::Array4::<f64>::zeros((dims[0], dims[1], dims[2], t));
         for tt in 0..t {
-            for vv in 0..v {
+            for (vv, &ph) in phi.iter().enumerate() {
                 let mag = 100.0 + 10.0 * rng.uniform()
                     + 5.0 * (rng.normal() * rng.normal().abs().powf(1.5));
-                let z = Complex64::new(mag, 0.0) * Complex64::new(phi[vv].cos(), phi[vv].sin());
+                let z = Complex64::new(mag, 0.0) * Complex64::new(ph.cos(), ph.sin());
                 let (x, y, zc) = (vv / (dims[1] * dims[2]), (vv / dims[2]) % dims[1], vv % dims[2]);
                 re[(x, y, zc, tt)] = z.re;
                 im[(x, y, zc, tt)] = z.im;
