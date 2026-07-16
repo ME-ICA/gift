@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use nalgebra::DMatrix;
 use num_complex::Complex64;
 
-use crate::complex_io::{read_complex, write_complex, ComplexType};
+use crate::complex_io::{read_complex, write_complex_like, ComplexType};
 use crate::pipeline::{run_complex_ica, Estimator, PipelineResult};
 
 /// Expand masked maps back to full volume length, zero outside the mask.
@@ -95,7 +95,10 @@ pub fn run_from_files(
         let base = format!("component_{:03}.nii", k + 1);
         let first = out_dir.join(format!("R_{base}"));
         let second = out_dir.join(format!("I_{base}"));
-        write_complex(vol, dims, &first, &second, kind)?;
+        // Carry the first subject's geometry onto the maps, matching Python's
+        // `write_complex(..., affine=affine)`. Without a reference the outputs get an
+        // identity affine and will not overlay on the subject's anatomy.
+        write_complex_like(vol, dims, &first, &second, kind, Some(&pairs[0].0))?;
         written.push((first, second));
     }
 

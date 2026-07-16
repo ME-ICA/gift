@@ -62,12 +62,37 @@ pub fn read_complex(
 }
 
 /// Split a complex volume back into GIFT's two-file representation.
+///
+/// The written maps get a default (identity) spatial header. Use
+/// [`write_complex_like`] to carry the geometry of an input volume over to the output.
 pub fn write_complex(
     data: &[Complex64],
     dims: [usize; 3],
     first: &Path,
     second: &Path,
     kind: ComplexType,
+) -> Result<(), String> {
+    write_complex_like(data, dims, first, second, kind, None)
+}
+
+/// As [`write_complex`], but copy the spatial header from `reference` (an existing NIfTI
+/// file) onto the outputs.
+///
+/// Without this, component maps are written with an identity affine and unit pixdim, so
+/// they are numerically correct but NOT spatially registered to the data they came from -
+/// they will not overlay on the subject's anatomy. Python's `write_complex(..., affine=)`
+/// propagates the input affine, so the Rust driver must do the same or the two ports are
+/// not interchangeable on real data.
+///
+/// A 4-D reference is fine for a 3-D map: `nifti`'s `prepare_header` overrides `dim` from
+/// the data's own shape and copies every other field from the reference.
+pub fn write_complex_like(
+    data: &[Complex64],
+    dims: [usize; 3],
+    first: &Path,
+    second: &Path,
+    kind: ComplexType,
+    reference: Option<&Path>,
 ) -> Result<(), String> {
     use nifti::writer::WriterOptions;
 
@@ -83,11 +108,19 @@ pub fn write_complex(
         })
         .unzip();
 
+    // `reference_file` is generic over `P: AsRef<Path> + Sized`, so the unsized `&Path`
+    // cannot bind directly; hand it an owned PathBuf that outlives the writer.
+    let reference = reference.map(|r| r.to_path_buf());
+
     for (path, vals) in [(first, a), (second, b)] {
         let arr = ndarray::Array3::from_shape_vec((dims[0], dims[1], dims[2]), vals)
             .map_err(|e| format!("bad shape for {}: {e}", path.display()))?;
-        WriterOptions::new(path)
-            .write_nifti(&arr)
+        let opts = WriterOptions::new(path);
+        let opts = match reference.as_ref() {
+            Some(r) => opts.reference_file(r),
+            None => opts,
+        };
+        opts.write_nifti(&arr)
             .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
     }
     Ok(())
