@@ -1,7 +1,7 @@
 mod common;
 
 use common::{fixtures_dir, match_sources, TestRng};
-use complex_gift::pipeline::{run_complex_ica, Estimator};
+use complex_gift::pipeline::{align_subject, run_complex_ica, Estimator};
 use nalgebra::DMatrix;
 use num_complex::Complex64;
 
@@ -108,10 +108,15 @@ fn end_to_end_group_complex_ica() {
         assert_eq!(s_i.shape(), (n, kept.len()), "subject {i} S_i shape");
         assert_eq!(a_i.shape(), (t, n), "subject {i} A_i shape");
 
-        // Rebuild subject i's masked, per-voxel temporally de-meaned data - exactly what
-        // two_stage_pca reduced. With n_subject == n_components the subject block Bi is
-        // square and invertible, so A_i * S_i is *precisely* the orthogonal projection of
-        // this matrix onto the rank-n signal subspace.
+        // Rebuild subject i's masked, per-voxel temporally de-meaned data. With
+        // n_subject == n_components the subject block Bi is square and invertible, so
+        // A_i * S_i is the orthogonal projection onto the rank-n signal subspace.
+        //
+        // Strictly it projects the ROW-CENTERED x: whiten_hermitian (whiten.rs:32-33)
+        // additionally removes each timepoint's mean over voxels. The Pythagoras identity
+        // in (c) still holds against the x rebuilt here because row-centering forces
+        // xc * 1 = 0, so the rank-1 cross-term the row mean would contribute vanishes
+        // exactly. Do not read (c) as "p projects precisely this x" - it does not.
         let mut x = DMatrix::<Complex64>::zeros(t, kept.len());
         for (c, &j) in kept.iter().enumerate() {
             for tt in 0..t {
@@ -180,4 +185,87 @@ fn end_to_end_group_complex_ica() {
             assert!(d > 0.1, "subjects {i} and {j} have identical maps (rel. diff {d:.4})");
         }
     }
+}
+
+/// The end-to-end fixture CANNOT pin the counter-rotation sign: when the group model holds
+/// and each subject block is full column rank, back-reconstructed maps already arrive in
+/// the group frame, so `align_to_reference` returns theta == 0 and both signs are the same
+/// code path. (Verified: flipping the sign in `align_subject` leaves the e2e output
+/// byte-identical, and deleting the whole alignment step leaves the e2e test green.)
+///
+/// So drive it directly with a synthetic NONZERO rotation, which is the only way to make
+/// the sign observable.
+#[test]
+fn align_subject_undoes_a_known_rotation_and_preserves_the_product() {
+    let mut rng = TestRng::new(7);
+    let (n, v, t) = (3usize, 40usize, 12usize);
+
+    // an arbitrary reference and an arbitrary mixing matrix
+    let s_ref = DMatrix::<Complex64>::from_fn(n, v, |_, _| {
+        Complex64::new(rng.normal(), rng.normal())
+    });
+    let a0 = DMatrix::<Complex64>::from_fn(t, n, |_, _| {
+        Complex64::new(rng.normal(), rng.normal())
+    });
+
+    // rotate each source by a KNOWN, DISTINCT, NONZERO phase
+    let applied = [0.7f64, -1.9, 2.6];
+    let mut s = s_ref.clone();
+    for k in 0..n {
+        let rot = Complex64::new(applied[k].cos(), applied[k].sin());
+        for i in 0..v {
+            s[(k, i)] *= rot;
+        }
+    }
+    let mut a = a0.clone();
+    // counter-rotate A so the pair starts out consistent: a * s == a0 * s_ref
+    for k in 0..n {
+        let inv = Complex64::new(applied[k].cos(), -applied[k].sin());
+        for r in 0..t {
+            a[(r, k)] *= inv;
+        }
+    }
+    let product_before = &a * &s;
+
+    let theta = align_subject(&mut s, &mut a, &s_ref);
+
+    // 1. the rotation was undone: theta == -applied, and s is back on s_ref
+    for k in 0..n {
+        let resid = (Complex64::new(theta[k].cos(), theta[k].sin())
+            * Complex64::new(applied[k].cos(), applied[k].sin())
+            - Complex64::new(1.0, 0.0))
+        .norm();
+        assert!(
+            resid < 1e-9,
+            "component {k}: theta {} does not undo the applied rotation {}",
+            theta[k],
+            applied[k]
+        );
+    }
+    let s_err = (&s - &s_ref).norm() / s_ref.norm();
+    assert!(s_err < 1e-9, "s was not rotated back onto s_ref (rel. err {s_err:.3e})");
+
+    // 2. THE SIGN: A must absorb the inverse rotation, so the product is invariant.
+    //    With the sign flipped this is the dominant failure - the product is rotated by
+    //    e^{2i*theta} per component instead of being left alone.
+    let p_err = (&a * &s - &product_before).norm() / product_before.norm();
+    assert!(
+        p_err < 1e-9,
+        "align_subject changed A*S (rel. err {p_err:.3e}); the A counter-rotation sign is wrong"
+    );
+}
+
+/// The concat loop indexes every subject with `subjects[0].ncols()`, so ragged input would
+/// panic out of bounds. It must be a clean Err instead.
+#[test]
+fn ragged_subjects_are_rejected() {
+    let a = DMatrix::<Complex64>::zeros(4, 6);
+    let b = DMatrix::<Complex64>::zeros(4, 5); // one voxel short
+    let err = run_complex_ica(&[a, b], 2, None, Estimator::NcFastica, &fixtures_dir())
+        .expect_err("ragged subjects must be rejected, not panic");
+    assert!(err.contains("subject 1"), "unhelpful error: {err}");
+
+    let err = run_complex_ica(&[], 2, None, Estimator::NcFastica, &fixtures_dir())
+        .expect_err("no subjects must be rejected");
+    assert!(err.contains("no subjects"), "unhelpful error: {err}");
 }

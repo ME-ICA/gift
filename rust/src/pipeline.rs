@@ -20,11 +20,37 @@ pub enum Estimator {
     NcFastica,
 }
 
+#[derive(Debug)]
 pub struct PipelineResult {
     pub s_group: DMatrix<Complex64>,
     pub a_group: DMatrix<Complex64>,
     pub mask: Vec<bool>,
     pub subjects: Vec<(DMatrix<Complex64>, DMatrix<Complex64>)>,
+}
+
+/// Rotate one subject's maps into the group frame, counter-rotating `a` so the pair still
+/// satisfies `x ~= a * s`. Returns the per-component rotation that was applied to `s`.
+///
+/// `align_to_reference` rotates row `k` of `s` by `e^{+i*theta_k}`, so column `k` of `a`
+/// must take `e^{-i*theta_k}` for the product to be invariant.
+///
+/// Split out of `run_complex_ica` so the sign is testable: when the group model holds and
+/// each subject block is full column rank, back-reconstructed maps already arrive in the
+/// group frame, so `theta` is identically zero on realistic data and no end-to-end fixture
+/// can tell the two signs apart. See `align_subject_*` in `tests/pipeline.rs`.
+pub fn align_subject(
+    s: &mut DMatrix<Complex64>,
+    a: &mut DMatrix<Complex64>,
+    s_ref: &DMatrix<Complex64>,
+) -> Vec<f64> {
+    let theta = align_to_reference(s, s_ref);
+    for (k, &th) in theta.iter().enumerate() {
+        let inv = Complex64::new(th.cos(), -th.sin());
+        for r in 0..a.nrows() {
+            a[(r, k)] *= inv;
+        }
+    }
+    theta
 }
 
 /// Run group complex ICA over subjects given as (T_i, V) complex matrices.
@@ -96,13 +122,7 @@ pub fn run_complex_ica(
     //    returned pair still satisfies X_i ~= A_i * S_i.
     let mut out = Vec::new();
     for (mut s_i, mut a_i) in back_reconstruct(&a_group, &red) {
-        let theta = align_to_reference(&mut s_i, &s_group);
-        for (k, &th) in theta.iter().enumerate() {
-            let inv = Complex64::new(th.cos(), -th.sin());
-            for r in 0..a_i.nrows() {
-                a_i[(r, k)] *= inv;
-            }
-        }
+        align_subject(&mut s_i, &mut a_i, &s_group);
         out.push((s_i, a_i));
     }
 
