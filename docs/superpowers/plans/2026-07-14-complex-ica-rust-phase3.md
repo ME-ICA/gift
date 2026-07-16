@@ -2606,10 +2606,13 @@ fn write_4d(
     let mut im = ndarray::Array4::<f64>::zeros((dims[0], dims[1], dims[2], t));
     for tt in 0..t {
         for vv in 0..v {
-            // NIfTI is x-fastest; our flat voxel index runs the same way
-            let x = vv % dims[0];
-            let y = (vv / dims[0]) % dims[1];
-            let z = vv / (dims[0] * dims[1]);
+            // The crate's flat voxel index is C-order (x SLOWEST) - read_volume calls
+            // .as_standard_layout() precisely to guarantee this, and write_complex builds
+            // its Array3 from a C-order buffer. Mapping vv x-fastest here (x = vv % nx)
+            // would silently disagree with the driver that reads these files back.
+            let z = vv % dims[2];
+            let y = (vv / dims[2]) % dims[1];
+            let x = vv / (dims[1] * dims[2]);
             re[(x, y, z, tt)] = flat[tt * v + vv].re;
             im[(x, y, z, tt)] = flat[tt * v + vv].im;
         }
@@ -2695,11 +2698,15 @@ pub fn run_from_files(
         }
         let v = this[0] * this[1] * this[2];
         let t = d[3];
-        // read_complex returns the volume flattened x-fastest, with time slowest
+        // read_complex returns the 4-D volume in C (standard) layout, so the LAST axis is
+        // fastest: flat = ((x*ny + y)*nz + z)*nt + tt. Time is FASTEST, not slowest.
+        // (Verified empirically: for dims [3,2,2,5] the first flat values run
+        // 0,1,2,3,4,10,... i.e. t cycling first.) Indexing this as `data[tt*v + vv]` reads
+        // a scrambled volume with no error.
         let mut m = DMatrix::<Complex64>::zeros(t, v);
         for tt in 0..t {
             for vv in 0..v {
-                m[(tt, vv)] = data[tt * v + vv];
+                m[(tt, vv)] = data[vv * t + tt];
             }
         }
         subjects.push(m);
