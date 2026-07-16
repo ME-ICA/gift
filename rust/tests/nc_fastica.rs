@@ -21,9 +21,17 @@ fn separates_the_shared_fixture_as_well_as_the_matlab_reference() {
 
     let isi_rust = isi(&(&res.w * &a_true));
     assert!(isi_rust < 0.05, "port separates poorly: ISI={isi_rust:.5}");
+
+    // nc-FastICA is FULLY DETERMINISTIC (the reference has no rand/randn), so this is not a
+    // "close enough" comparison - the port reproduces MATLAB's ISI to every printed digit
+    // and the bound says so. The old bound (2*isi_matlab + 0.01) allowed 3.4x drift, which
+    // is dishonest for a deterministic estimator AND left real bugs invisible: corrupting
+    // the pseudo-covariance to the conjugate transpose merely doubles ISI to ~0.0131, which
+    // the loose bound absorbed silently. A near-equality bound is what gives that mutation
+    // teeth here.
     assert!(
-        isi_rust < 2.0 * isi_matlab + 0.01,
-        "port is materially worse than MATLAB: rust={isi_rust:.5} matlab={isi_matlab:.5}"
+        (isi_rust - isi_matlab).abs() < 1e-6,
+        "deterministic port must reproduce MATLAB's ISI: rust={isi_rust:.12} matlab={isi_matlab:.12}"
     );
 
     let (perm, corr) = match_sources(&res.s, &cs);

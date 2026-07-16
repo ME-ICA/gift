@@ -23,6 +23,7 @@ details: <https://www.gnu.org/licenses/>.
 import numpy as np
 
 from .base import EstimatorResult
+from .cebm import _pseudo_cov
 
 _A2 = 0.05  # nonlinearity smoothing constant (reference: a2)
 _NONLINEARITIES = ("log", "kurt", "sqrt")
@@ -90,7 +91,12 @@ def nc_fastica(X, nonlinearity="log", tol=1e-5, max_iter=None):
 
     # Pseudo-covariance: PLAIN transpose (NOT conjugate) - this is what lets the
     # algorithm exploit noncircularity. Do not change `.T` to `.conj().T` here.
-    pC = (x @ x.T) / m
+    # Pseudo-covariance E[x x^T]: PLAIN transpose (NOT conjugate). Share CEBM's named,
+    # separately-guarded helper rather than inlining it -- a code comment is not a guard.
+    # A whole-phase review found that corrupting this inline to `.conj().T` left ALL 41
+    # tests green (ISI merely doubles, well inside the bound), which is the exact bug class
+    # a Phase-2 review PROVED the ISI oracle cannot catch.
+    pC = _pseudo_cov(x)
 
     W = np.eye(n, dtype=np.complex128)
     Wold = np.zeros((n, n), dtype=np.complex128)

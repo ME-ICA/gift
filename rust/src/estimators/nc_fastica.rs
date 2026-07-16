@@ -23,6 +23,7 @@
 use nalgebra::DMatrix;
 use num_complex::Complex64;
 
+use super::cebm::pseudo_cov;
 use super::EstimatorResult;
 
 /// Nonlinearity smoothing constant (reference: `a2`). Live constant - NOT dead code
@@ -131,9 +132,13 @@ pub fn nc_fastica(
 
     let xw = &q * x; // whitened, but NOT mean-centered (matches the reference)
 
-    // Pseudo-covariance: PLAIN transpose (NOT conjugate) - this is what lets the
-    // algorithm exploit noncircularity. Do not change `.transpose()` to `.adjoint()`.
-    let pc = (&xw * xw.transpose()) / Complex64::new(m as f64, 0.0);
+    // Pseudo-covariance E[x x^T]: PLAIN transpose (NOT conjugate) - this is what lets the
+    // algorithm exploit noncircularity. Share CEBM's named, separately-guarded helper
+    // rather than inlining it: a code comment is not a guard. A whole-phase review found
+    // that corrupting this to `.adjoint()` inline left ALL 40 tests green (ISI merely
+    // doubles, 0.0069 -> 0.0131, well inside the bar), reproducing the exact bug class a
+    // Phase-2 review PROVED the ISI oracle cannot catch.
+    let pc = pseudo_cov(&xw);
 
     let mut w = DMatrix::<Complex64>::identity(n, n);
     let mut w_old = DMatrix::<Complex64>::zeros(n, n);

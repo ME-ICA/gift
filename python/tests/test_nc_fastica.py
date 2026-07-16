@@ -42,9 +42,14 @@ def test_matches_matlab_oracle_on_the_shared_fixture(fixtures_dir, sources):
     isi_python = isi(res.W @ A_true)
 
     assert isi_python < 0.05, f"port separates poorly: ISI={isi_python:.4f}"
-    assert isi_python < 2 * isi_matlab + 0.01, (
-        f"port is materially worse than the MATLAB reference: "
-        f"python={isi_python:.4f} matlab={isi_matlab:.4f}"
+    # nc-FastICA is FULLY DETERMINISTIC (the reference has no rand/randn), so this is not
+    # a "close enough" comparison -- the port reproduces MATLAB's ISI to ~1e-15. The old
+    # bound (2*isi_matlab + 0.01) allowed 3.4x drift, which is dishonest for a
+    # deterministic estimator AND hid real bugs: corrupting the pseudo-covariance to the
+    # conjugate transpose merely doubles ISI, which the loose bound absorbed silently.
+    assert abs(isi_python - isi_matlab) < 1e-6, (
+        f"deterministic port must reproduce MATLAB's ISI: "
+        f"python={isi_python:.12f} matlab={isi_matlab:.12f}"
     )
     # and it recovers the true sources
     perm, corr = match_sources(res.S, cS)
