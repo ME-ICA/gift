@@ -5,6 +5,12 @@
 //! GIFT's two-file complex volumes, flattens them, runs the pipeline, expands the maps back
 //! to full volume shape, and writes them out as complex NIfTI pairs.
 //!
+//! Component NUMBERING IS NOT STABLE ACROSS PORTS OR RUNS. ICA fixes neither the order nor
+//! the phase of its components, and no port canonicalizes them, so `component_001` here and
+//! `component_001` from the Python driver are generally DIFFERENT sources - even for the
+//! deterministic estimator, where the two agree to ~4e-14 once matched up. Match components
+//! by correlation, never by filename.
+//!
 //! Mirrors `python/complex_gift/driver.py`; the two ports are meant to be interchangeable.
 //! Python's `unmask` returns an `(N, *dims)` array where this returns `N` flat volumes -
 //! idiomatic per language, but the voxel ORDER is identical.

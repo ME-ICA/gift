@@ -1,5 +1,11 @@
 """File-level driver: complex NIfTI in, complex component maps out.
 
+Component NUMBERING IS NOT STABLE ACROSS PORTS OR RUNS. ICA fixes neither the order nor
+the phase of its components, and no port canonicalizes them, so ``component_001`` here and
+``component_001`` from the Rust driver are generally DIFFERENT sources -- even for the
+deterministic estimator, where the two agree to ~4e-14 once matched up. Match components
+by correlation, never by filename.
+
 `pipeline.run_complex_ica` works on in-memory `(T, V)` arrays and returns maps over the
 masked voxels only. This module is the thin layer that makes the package usable on real
 data: it loads GIFT's two-file complex volumes, flattens them, runs the pipeline, expands
