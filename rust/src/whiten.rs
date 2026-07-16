@@ -45,6 +45,12 @@ pub fn whiten_hermitian(x: &DMatrix<Complex64>, n_components: usize) -> Result<W
 
     let d_max = eig.eigenvalues[order[0]];
     let d_min = eig.eigenvalues[*keep.last().expect("n >= 1")];
+    // DELIBERATE: `!(a > b)`, not `a <= b`. These differ on NaN, and the difference is the
+    // whole point of this guard. If d_min is NaN, `d_min > x` is false, so `!(...)` is TRUE
+    // and we return the error. Clippy suggests `d_min <= 1e-12 * d_max`, which is FALSE for
+    // NaN - that would skip the guard and let a NaN-contaminated result through, exactly
+    // the failure this exists to prevent. Do not "simplify" it.
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
     if !(d_min > 1e-12 * d_max) {
         return Err(format!(
             "whiten_hermitian: data is rank-deficient at n_components={n} (smallest \

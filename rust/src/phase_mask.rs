@@ -30,6 +30,12 @@ pub fn otsu_threshold(x: &[f64]) -> f64 {
     let finite: Vec<f64> = x.iter().copied().filter(|v| v.is_finite()).collect();
     let lo = finite.iter().copied().fold(f64::INFINITY, f64::min);
     let hi = finite.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    // DELIBERATE: `!(hi > lo)`, not `hi <= lo` - they differ on NaN, and this form is the
+    // safe one (see whiten.rs). It also catches the empty-input case, where the folds leave
+    // lo = +inf and hi = -inf; `lo` is then returned as a degenerate "no threshold", which
+    // makes every mask comparison false (keep nothing). Callers must treat a constant or
+    // empty Q as degenerate rather than trusting the number - `run_complex_ica` does.
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
     if !(hi > lo) {
         return lo;
     }
@@ -55,6 +61,8 @@ pub fn otsu_threshold(x: &[f64]) -> f64 {
         .sum();
 
     let (mut best_k, mut best) = (0usize, f64::NEG_INFINITY);
+    // `k` is used as a VALUE here (the bin's ordinal enters mu), not merely as an index.
+    #[allow(clippy::needless_range_loop)]
     for k in 0..NBINS {
         let p = counts[k] / total;
         omega += p;

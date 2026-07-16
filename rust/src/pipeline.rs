@@ -97,6 +97,9 @@ pub fn run_complex_ica(
     // test downstream can see it.
     let q_lo = q.iter().copied().fold(f64::INFINITY, f64::min);
     let q_hi = q.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    // DELIBERATE `!(a > b)` rather than `a <= b`: NaN-safe, so an all-NaN Q is rejected
+    // here too rather than sliding through. See whiten.rs for the full reasoning.
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
     if !(q_hi - q_lo > 1e-9 * q_hi.abs().max(1.0)) {
         return Err(format!(
             "run_complex_ica: the phase-quality map is degenerate (Q spans [{q_lo:.6e}, \

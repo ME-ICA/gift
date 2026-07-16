@@ -129,6 +129,9 @@ pub fn simplified_ppval(pp: &Pp, xs: f64) -> f64 {
     let x = xs - b[i];
     let row = &c[i];
     let mut v = row[0];
+    // Horner's method over a fixed 4-coefficient cubic: the index form matches the
+    // reference's ppval and reads as the polynomial it is.
+    #[allow(clippy::needless_range_loop)]
     for j in 1..4 {
         v = x * v + row[j];
     }

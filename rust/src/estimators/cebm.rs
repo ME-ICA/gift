@@ -435,6 +435,9 @@ fn north(
         let gram = w.adjoint() * &w;
         let mut cost = -(gram.determinant().norm().ln());
 
+        // `row` drives branching logic (n > 7 / row == 0), not just indexing; the index
+        // form mirrors the MATLAB reference this is transcribed from.
+        #[allow(clippy::needless_range_loop)]
         for row in 0..n {
             let h: DVector<Complex64> = if n > 7 {
                 if row == 0 {
