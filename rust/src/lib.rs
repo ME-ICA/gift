@@ -8,4 +8,5 @@ pub mod group;
 pub mod nf_table;
 pub mod phase_correct;
 pub mod phase_mask;
+pub mod pipeline;
 pub mod whiten;
