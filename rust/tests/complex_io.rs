@@ -58,3 +58,68 @@ fn write_then_read_roundtrips() {
     }
 }
 
+
+/// Task 11's driver is the first consumer to flatten a 4-D volume, and the ordering it
+/// assumes is invisible to the type system: reading a (nx,ny,nz,nt) volume as time-slowest
+/// instead of time-fastest yields a same-shaped, silently scrambled matrix.
+///
+/// So pin the contract here, at its source: `read_complex` returns the volume in C
+/// (standard) layout over ALL FOUR axes, i.e. flat = ((x*ny + y)*nz + z)*nt + t. Time is the
+/// FASTEST axis; the flat VOXEL index is vv = x*(ny*nz) + y*nz + z, with x SLOWEST.
+/// (`read_volume` calls `.as_standard_layout()` for exactly this reason.)
+#[test]
+fn reads_a_4d_volume_in_c_order_with_time_fastest() {
+    use nifti::writer::WriterOptions;
+
+    let (nx, ny, nz, nt) = (3usize, 2, 4, 5);
+    let dir = std::env::temp_dir().join("cg_rust_io_4d");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+
+    // Every element gets a UNIQUE value encoding its own 4-D C-order position, so any
+    // transposition, axis swap or partial scramble changes at least one value.
+    let mut re = ndarray::Array4::<f64>::zeros((nx, ny, nz, nt));
+    let mut im = ndarray::Array4::<f64>::zeros((nx, ny, nz, nt));
+    for x in 0..nx {
+        for y in 0..ny {
+            for z in 0..nz {
+                for t in 0..nt {
+                    re[(x, y, z, t)] = (((x * ny + y) * nz + z) * nt + t) as f64;
+                    im[(x, y, z, t)] = (x * 100 + y * 10 + z) as f64; // voxel identity only
+                }
+            }
+        }
+    }
+    let f1 = dir.join("R_probe4d.nii");
+    let f2 = dir.join("I_probe4d.nii");
+    WriterOptions::new(&f1).write_nifti(&re).unwrap();
+    WriterOptions::new(&f2).write_nifti(&im).unwrap();
+
+    let (data, d) = read_complex(&f1, &f2, ComplexType::RealImag).expect("read 4-D");
+    assert_eq!(d, [nx, ny, nz, nt]);
+    assert_eq!(data.len(), nx * ny * nz * nt);
+
+    // the flat index IS the C-order 4-D index
+    for (i, z) in data.iter().enumerate() {
+        assert!(
+            (z.re - i as f64).abs() < 1e-9,
+            "flat position {i} holds {} - read_complex is not returning C order",
+            z.re
+        );
+    }
+
+    // and therefore data[vv * nt + tt] is voxel vv at time tt, with vv C-order over (x,y,z)
+    for x in 0..nx {
+        for y in 0..ny {
+            for z in 0..nz {
+                let vv = x * (ny * nz) + y * nz + z;
+                for tt in 0..nt {
+                    assert!(
+                        (data[vv * nt + tt].im - (x * 100 + y * 10 + z) as f64).abs() < 1e-9,
+                        "voxel ({x},{y},{z}) is not at flat voxel index {vv}"
+                    );
+                }
+            }
+        }
+    }
+}
