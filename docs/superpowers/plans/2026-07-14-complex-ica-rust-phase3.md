@@ -2070,7 +2070,7 @@ Expected: FAIL — unresolved import `complex_gift::complex_io`.
 
 use std::path::{Path, PathBuf};
 
-use nifti::{NiftiObject, NiftiVolume, ReaderOptions};
+use nifti::{IntoNdArray, NiftiObject, NiftiVolume, ReaderOptions};
 use num_complex::Complex64;
 
 #[derive(Debug, Clone, Copy)]
@@ -2091,11 +2091,14 @@ fn read_volume(path: &Path) -> Result<(Vec<f64>, [usize; 4]), String> {
         *d.get(2).unwrap_or(&1) as usize,
         *d.get(3).unwrap_or(&1) as usize,
     ];
-    let data: Vec<f64> = vol
+    let arr = vol
         .into_ndarray::<f64>()
-        .map_err(|e| format!("cannot decode {}: {e}", path.display()))?
-        .into_raw_vec_and_offset()
-        .0;
+        .map_err(|e| format!("cannot decode {}: {e}", path.display()))?;
+    // `into_ndarray` hands back the volume in Fortran (x-fastest) memory order, matching the
+    // raw on-disk NIfTI layout. Convert to standard (C, last-axis-fastest) layout before
+    // flattening so the returned Vec enumerates voxels in the same order callers (and the
+    // fixtures) expect: index = i*(ny*nz) + j*nz + k for dims [nx, ny, nz].
+    let data: Vec<f64> = arr.as_standard_layout().into_owned().into_raw_vec_and_offset().0;
     Ok((data, dims))
 }
 
