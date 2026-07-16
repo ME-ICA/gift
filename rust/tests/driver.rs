@@ -14,9 +14,8 @@ fn unmask_restores_full_volume_length_with_zeros_outside() {
     let mask: Vec<bool> = (0..v).map(|i| i % 2 == 0).collect();
     let kept = mask.iter().filter(|&&m| m).count();
 
-    let s = DMatrix::<Complex64>::from_fn(2, kept, |i, j| {
-        Complex64::new((i * kept + j) as f64, 1.0)
-    });
+    let s =
+        DMatrix::<Complex64>::from_fn(2, kept, |i, j| Complex64::new((i * kept + j) as f64, 1.0));
     let vols = unmask(&s, &mask, dims);
 
     assert_eq!(vols.len(), 2);
@@ -72,7 +71,10 @@ fn unmask_rejects_a_mask_that_does_not_match() {
     let s = DMatrix::<Complex64>::zeros(1, 3);
     let mask = vec![true; 8]; // 8 kept, but s has 3 columns
     let err = std::panic::catch_unwind(|| unmask(&s, &mask, dims));
-    assert!(err.is_err(), "mismatched mask must not be accepted silently");
+    assert!(
+        err.is_err(),
+        "mismatched mask must not be accepted silently"
+    );
 
     // kept < ncols is the SILENT direction: without the assert this returns a
     // plausible-looking volume having quietly dropped the trailing columns. This is what
@@ -117,9 +119,8 @@ fn run_from_files_writes_component_maps() {
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
 
-    let smaps = DMatrix::<f64>::from_fn(n, v_sig, |_, _| {
-        rng.normal() * rng.normal().abs().powf(1.5)
-    });
+    let smaps =
+        DMatrix::<f64>::from_fn(n, v_sig, |_, _| rng.normal() * rng.normal().abs().powf(1.5));
     let scale = smaps.iter().fold(0.0f64, |m, &x| m.max(x.abs()));
     let smaps = smaps / scale;
     let phi: Vec<f64> = (0..v_sig)
@@ -293,31 +294,49 @@ fn written_maps_inherit_the_input_geometry() {
     };
 
     // phase-stable signal everywhere, so the mask keeps voxels and the pipeline runs
-    let phi: Vec<f64> = (0..v).map(|_| (rng.uniform() * 20.0 - 10.0) / 180.0 * std::f64::consts::PI).collect();
+    let phi: Vec<f64> = (0..v)
+        .map(|_| (rng.uniform() * 20.0 - 10.0) / 180.0 * std::f64::consts::PI)
+        .collect();
     let mut pairs = Vec::new();
     for s in 0..n_sub {
         let mut re = ndarray::Array4::<f64>::zeros((dims[0], dims[1], dims[2], t));
         let mut im = ndarray::Array4::<f64>::zeros((dims[0], dims[1], dims[2], t));
         for tt in 0..t {
             for (vv, &ph) in phi.iter().enumerate() {
-                let mag = 100.0 + 10.0 * rng.uniform()
+                let mag = 100.0
+                    + 10.0 * rng.uniform()
                     + 5.0 * (rng.normal() * rng.normal().abs().powf(1.5));
                 let z = Complex64::new(mag, 0.0) * Complex64::new(ph.cos(), ph.sin());
-                let (x, y, zc) = (vv / (dims[1] * dims[2]), (vv / dims[2]) % dims[1], vv % dims[2]);
+                let (x, y, zc) = (
+                    vv / (dims[1] * dims[2]),
+                    (vv / dims[2]) % dims[1],
+                    vv % dims[2],
+                );
                 re[(x, y, zc, tt)] = z.re;
                 im[(x, y, zc, tt)] = z.im;
             }
         }
         let f1 = dir.join(format!("R_s{s:02}.nii"));
         let f2 = dir.join(format!("I_s{s:02}.nii"));
-        nifti::writer::WriterOptions::new(&f1).reference_header(&href).write_nifti(&re).unwrap();
-        nifti::writer::WriterOptions::new(&f2).reference_header(&href).write_nifti(&im).unwrap();
+        nifti::writer::WriterOptions::new(&f1)
+            .reference_header(&href)
+            .write_nifti(&re)
+            .unwrap();
+        nifti::writer::WriterOptions::new(&f2)
+            .reference_header(&href)
+            .write_nifti(&im)
+            .unwrap();
         pairs.push((f1, f2));
     }
 
     let out = dir.join("out");
     let (_res, written) = run_from_files(
-        &pairs, n, &out, ComplexType::RealImag, Estimator::NcFastica, &fixtures_dir(),
+        &pairs,
+        n,
+        &out,
+        ComplexType::RealImag,
+        Estimator::NcFastica,
+        &fixtures_dir(),
     )
     .expect("driver");
 
@@ -325,14 +344,42 @@ fn written_maps_inherit_the_input_geometry() {
         for p in [f1, f2] {
             let obj = ReaderOptions::new().read_file(p).expect("read map");
             let h = obj.header();
-            assert_eq!(h.srow_x, href.srow_x, "{}: srow_x not inherited", p.display());
-            assert_eq!(h.srow_y, href.srow_y, "{}: srow_y not inherited", p.display());
-            assert_eq!(h.srow_z, href.srow_z, "{}: srow_z not inherited", p.display());
-            assert_eq!(h.sform_code, href.sform_code, "{}: sform_code lost", p.display());
-            assert_eq!(&h.pixdim[1..4], &href.pixdim[1..4], "{}: voxel sizes lost", p.display());
+            assert_eq!(
+                h.srow_x,
+                href.srow_x,
+                "{}: srow_x not inherited",
+                p.display()
+            );
+            assert_eq!(
+                h.srow_y,
+                href.srow_y,
+                "{}: srow_y not inherited",
+                p.display()
+            );
+            assert_eq!(
+                h.srow_z,
+                href.srow_z,
+                "{}: srow_z not inherited",
+                p.display()
+            );
+            assert_eq!(
+                h.sform_code,
+                href.sform_code,
+                "{}: sform_code lost",
+                p.display()
+            );
+            assert_eq!(
+                &h.pixdim[1..4],
+                &href.pixdim[1..4],
+                "{}: voxel sizes lost",
+                p.display()
+            );
             // the maps are 3-D even though the inputs were 4-D
             assert_eq!(h.dim[0], 3, "{}: expected a 3-D map", p.display());
-            assert_eq!(&h.dim[1..4], &[dims[0] as u16, dims[1] as u16, dims[2] as u16]);
+            assert_eq!(
+                &h.dim[1..4],
+                &[dims[0] as u16, dims[1] as u16, dims[2] as u16]
+            );
         }
     }
 }

@@ -13,9 +13,12 @@ fn nifti_dir() -> std::path::PathBuf {
 #[test]
 fn reads_a_real_imaginary_pair() {
     let d = nifti_dir();
-    let (data, dims) =
-        read_complex(&d.join("R_probe.nii"), &d.join("I_probe.nii"), ComplexType::RealImag)
-            .expect("read");
+    let (data, dims) = read_complex(
+        &d.join("R_probe.nii"),
+        &d.join("I_probe.nii"),
+        ComplexType::RealImag,
+    )
+    .expect("read");
     assert_eq!(dims[0] * dims[1] * dims[2] * dims[3], data.len());
     // the probe volume was written as re = index, im = -index
     assert!((data[5].re - 5.0).abs() < 1e-9);
@@ -54,10 +57,12 @@ fn write_then_read_roundtrips() {
     let (back, d) = read_complex(&f1, &f2, ComplexType::RealImag).expect("read");
     assert_eq!([d[0], d[1], d[2]], dims);
     for i in 0..n {
-        assert!((back[i] - data[i]).norm() < 1e-9, "roundtrip lost value at {i}");
+        assert!(
+            (back[i] - data[i]).norm() < 1e-9,
+            "roundtrip lost value at {i}"
+        );
     }
 }
-
 
 /// Task 11's driver is the first consumer to flatten a 4-D volume, and the ordering it
 /// assumes is invisible to the type system: reading a (nx,ny,nz,nt) volume as time-slowest

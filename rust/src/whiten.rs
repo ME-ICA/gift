@@ -9,15 +9,12 @@ use nalgebra::DMatrix;
 use num_complex::Complex64;
 
 pub struct Whitening {
-    pub xw: DMatrix<Complex64>,        // (N, T)
-    pub w_whiten: DMatrix<Complex64>,  // (N, P)
+    pub xw: DMatrix<Complex64>,         // (N, T)
+    pub w_whiten: DMatrix<Complex64>,   // (N, P)
     pub w_dewhiten: DMatrix<Complex64>, // (P, N)
 }
 
-pub fn whiten_hermitian(
-    x: &DMatrix<Complex64>,
-    n_components: usize,
-) -> Result<Whitening, String> {
+pub fn whiten_hermitian(x: &DMatrix<Complex64>, n_components: usize) -> Result<Whitening, String> {
     let (p, t) = x.shape();
     if n_components > p {
         return Err(format!(
@@ -68,5 +65,9 @@ pub fn whiten_hermitian(
     }
 
     let xw = &w_whiten * &xc;
-    Ok(Whitening { xw, w_whiten, w_dewhiten })
+    Ok(Whitening {
+        xw,
+        w_whiten,
+        w_dewhiten,
+    })
 }

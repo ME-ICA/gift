@@ -65,10 +65,7 @@ pub fn correct_phase(
 ///
 /// Per-subject phase corrections are independent, so without this the residual rotations
 /// reintroduce non-physiological variance before group statistics.
-pub fn align_to_reference(
-    s: &mut DMatrix<Complex64>,
-    s_ref: &DMatrix<Complex64>,
-) -> Vec<f64> {
+pub fn align_to_reference(s: &mut DMatrix<Complex64>, s_ref: &DMatrix<Complex64>) -> Vec<f64> {
     let (n, v) = s.shape();
     let mut theta = vec![0.0; n];
     for k in 0..n {

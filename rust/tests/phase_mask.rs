@@ -6,8 +6,8 @@ use complex_gift::phase_mask::{otsu_threshold, phase_quality_mask, quality_map};
 #[test]
 fn quality_map_matches_python_elementwise() {
     // Pure arithmetic => elementwise-comparable against the Python oracle.
-    let z = load_c64("parity_mask_Z");       // (500, 80)
-    let q_py = load_f64("parity_mask_Q");    // (1, 500)
+    let z = load_c64("parity_mask_Z"); // (500, 80)
+    let q_py = load_f64("parity_mask_Q"); // (1, 500)
     let q = quality_map(&z);
     assert_eq!(q.len(), q_py.ncols());
     for v in 0..q.len() {
@@ -36,7 +36,10 @@ fn mask_and_threshold_match_python() {
         .zip(mask_py.iter())
         .filter(|(&r, &p)| r != (p == 1))
         .count();
-    assert_eq!(disagreements, 0, "mask disagrees with Python on {disagreements} voxels");
+    assert_eq!(
+        disagreements, 0,
+        "mask disagrees with Python on {disagreements} voxels"
+    );
 }
 
 #[test]

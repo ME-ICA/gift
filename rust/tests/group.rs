@@ -16,10 +16,10 @@ fn make_subjects(
     t: usize,
     n_sub: usize,
 ) -> (Vec<DMatrix<Complex64>>, Vec<DMatrix<Complex64>>) {
-    let smaps = DMatrix::<f64>::from_fn(n, v, |_, _| {
-        rng.normal() * rng.normal().abs().powf(1.5)
-    });
-    let phi: Vec<f64> = (0..v).map(|_| (rng.uniform() * 20.0 - 10.0) / 180.0 * std::f64::consts::PI).collect();
+    let smaps = DMatrix::<f64>::from_fn(n, v, |_, _| rng.normal() * rng.normal().abs().powf(1.5));
+    let phi: Vec<f64> = (0..v)
+        .map(|_| (rng.uniform() * 20.0 - 10.0) / 180.0 * std::f64::consts::PI)
+        .collect();
 
     let mut subjects = Vec::new();
     let mut truths = Vec::new();

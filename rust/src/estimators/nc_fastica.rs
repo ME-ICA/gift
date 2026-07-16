@@ -209,5 +209,9 @@ pub fn nc_fastica(
     })?;
     let s_out = &w_out * x;
 
-    Ok(EstimatorResult { w: w_out, a: a_out, s: s_out })
+    Ok(EstimatorResult {
+        w: w_out,
+        a: a_out,
+        s: s_out,
+    })
 }

@@ -15,7 +15,10 @@ fn whitening_makes_the_covariance_identity() {
     let t = x.ncols() as f64;
     let cov = (&w.xw * w.xw.adjoint()) / Complex64::new(t, 0.0);
     let err = (&cov - DMatrix::<Complex64>::identity(n, n)).norm();
-    assert!(err < 1e-8, "whitened covariance is not identity (err {err:.3e})");
+    assert!(
+        err < 1e-8,
+        "whitened covariance is not identity (err {err:.3e})"
+    );
 }
 
 #[test]
@@ -34,7 +37,10 @@ fn dewhitening_reconstructs_the_centred_data() {
 
     let recon = &w.w_dewhiten * &w.xw;
     let err = (&recon - &xc).norm() / xc.norm();
-    assert!(err < 1e-10, "dewhitening did not reconstruct (rel err {err:.3e})");
+    assert!(
+        err < 1e-10,
+        "dewhitening did not reconstruct (rel err {err:.3e})"
+    );
 }
 
 #[test]

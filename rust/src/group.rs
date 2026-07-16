@@ -38,8 +38,7 @@ pub fn two_stage_pca(
         let mut x = xi.clone();
         let t = x.nrows();
         for mut col in x.column_iter_mut() {
-            let mean: Complex64 =
-                col.iter().sum::<Complex64>() / Complex64::new(t as f64, 0.0);
+            let mean: Complex64 = col.iter().sum::<Complex64>() / Complex64::new(t as f64, 0.0);
             col.iter_mut().for_each(|z| *z -= mean);
         }
 
@@ -59,7 +58,12 @@ pub fn two_stage_pca(
     }
 
     let g = whiten_hermitian(&stacked, n_group)?;
-    Ok(Reduction { xg: g.xw, reduced, whiteners, w_group: g.w_whiten })
+    Ok(Reduction {
+        xg: g.xw,
+        reduced,
+        whiteners,
+        w_group: g.w_whiten,
+    })
 }
 
 /// GICA back-reconstruction to subject-specific maps and time courses.
@@ -99,10 +103,16 @@ pub fn back_reconstruct(
         let bi = b.view((offset, 0), (rows, b.ncols())).into_owned(); // (n_subject, N)
         offset += rows;
 
-        let pinv_bi = bi.clone().pseudo_inverse(1e-12).expect("pinv of the subject block");
+        let pinv_bi = bi
+            .clone()
+            .pseudo_inverse(1e-12)
+            .expect("pinv of the subject block");
         let s_i = pinv_bi * y_i; // (N, V) - uses the subject's ACTUAL reduced data
 
-        let pinv_wi = w_i.clone().pseudo_inverse(1e-12).expect("pinv of the subject whitener");
+        let pinv_wi = w_i
+            .clone()
+            .pseudo_inverse(1e-12)
+            .expect("pinv of the subject whitener");
         let a_i = pinv_wi * &bi; // (T_i, N)
 
         out.push((s_i, a_i));

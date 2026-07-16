@@ -12,9 +12,8 @@ fn end_to_end_group_complex_ica() {
     let v = v_sig + v_noise;
 
     // super-Gaussian spatial maps (ICA cannot separate Gaussian sources at all)
-    let smaps = DMatrix::<f64>::from_fn(n, v_sig, |_, _| {
-        rng.normal() * rng.normal().abs().powf(1.5)
-    });
+    let smaps =
+        DMatrix::<f64>::from_fn(n, v_sig, |_, _| rng.normal() * rng.normal().abs().powf(1.5));
     let scale = smaps.iter().fold(0.0f64, |m, &x| m.max(x.abs()));
     let smaps = smaps / scale;
 
@@ -33,8 +32,8 @@ fn end_to_end_group_complex_ica() {
             for vv in 0..v_sig {
                 let mag = 100.0 + 10.0 * rng.uniform() + 5.0 * modulation[(tt, vv)];
                 assert!(mag > 0.0);
-                z[(tt, vv)] = Complex64::new(mag, 0.0)
-                    * Complex64::new(phi[vv].cos(), phi[vv].sin());
+                z[(tt, vv)] =
+                    Complex64::new(mag, 0.0) * Complex64::new(phi[vv].cos(), phi[vv].sin());
             }
             // noise voxels: random phase per timepoint -> the mask must drop them
             for vv in v_sig..v {
@@ -58,8 +57,14 @@ fn end_to_end_group_complex_ica() {
     // the phase mask kept the signal voxels and dropped the random-phase ones
     let kept_sig = res.mask[..v_sig].iter().filter(|&&m| m).count() as f64 / v_sig as f64;
     let kept_noise = res.mask[v_sig..].iter().filter(|&&m| m).count() as f64 / v_noise as f64;
-    assert!(kept_sig > 0.9, "mask dropped signal voxels: kept {kept_sig:.3}");
-    assert!(kept_noise < 0.05, "mask kept noise voxels: kept {kept_noise:.3}");
+    assert!(
+        kept_sig > 0.9,
+        "mask dropped signal voxels: kept {kept_sig:.3}"
+    );
+    assert!(
+        kept_noise < 0.05,
+        "mask kept noise voxels: kept {kept_noise:.3}"
+    );
 
     // the group decomposition recovered the true maps (up to permutation/phase).
     // Build the truth over ALL voxels (noise voxels carry no signal) and apply the SAME
@@ -67,8 +72,8 @@ fn end_to_end_group_complex_ica() {
     let mut strue_full = DMatrix::<Complex64>::zeros(n, v);
     for i in 0..n {
         for j in 0..v_sig {
-            strue_full[(i, j)] = Complex64::new(smaps[(i, j)], 0.0)
-                * Complex64::new(phi[j].cos(), phi[j].sin());
+            strue_full[(i, j)] =
+                Complex64::new(smaps[(i, j)], 0.0) * Complex64::new(phi[j].cos(), phi[j].sin());
         }
     }
     let kept: Vec<usize> = (0..v).filter(|&j| res.mask[j]).collect();
@@ -135,7 +140,10 @@ fn end_to_end_group_complex_ica() {
 
         // (a) the product carries real energy - fails immediately on zeros/garbage
         let frac = pn / xn;
-        assert!(frac > 0.3, "subject {i}: A_i*S_i carries no energy (||p||/||x|| = {frac:.4})");
+        assert!(
+            frac > 0.3,
+            "subject {i}: A_i*S_i carries no energy (||p||/||x|| = {frac:.4})"
+        );
 
         // (b) <x, A_i*S_i> is real and positive. A projection cannot rotate what it keeps,
         //     so any spurious per-component phase on A_i shows up here as a nonzero arg.
@@ -182,7 +190,10 @@ fn end_to_end_group_complex_ica() {
     for i in 0..n_sub {
         for j in (i + 1)..n_sub {
             let d = nrm(&(&res.subjects[i].0 - &res.subjects[j].0)) / nrm(&res.s_group);
-            assert!(d > 0.1, "subjects {i} and {j} have identical maps (rel. diff {d:.4})");
+            assert!(
+                d > 0.1,
+                "subjects {i} and {j} have identical maps (rel. diff {d:.4})"
+            );
         }
     }
 }
@@ -201,12 +212,9 @@ fn align_subject_undoes_a_known_rotation_and_preserves_the_product() {
     let (n, v, t) = (3usize, 40usize, 12usize);
 
     // an arbitrary reference and an arbitrary mixing matrix
-    let s_ref = DMatrix::<Complex64>::from_fn(n, v, |_, _| {
-        Complex64::new(rng.normal(), rng.normal())
-    });
-    let a0 = DMatrix::<Complex64>::from_fn(t, n, |_, _| {
-        Complex64::new(rng.normal(), rng.normal())
-    });
+    let s_ref =
+        DMatrix::<Complex64>::from_fn(n, v, |_, _| Complex64::new(rng.normal(), rng.normal()));
+    let a0 = DMatrix::<Complex64>::from_fn(t, n, |_, _| Complex64::new(rng.normal(), rng.normal()));
 
     // rotate each source by a KNOWN, DISTINCT, NONZERO phase
     let applied = [0.7f64, -1.9, 2.6];
@@ -243,7 +251,10 @@ fn align_subject_undoes_a_known_rotation_and_preserves_the_product() {
         );
     }
     let s_err = (&s - &s_ref).norm() / s_ref.norm();
-    assert!(s_err < 1e-9, "s was not rotated back onto s_ref (rel. err {s_err:.3e})");
+    assert!(
+        s_err < 1e-9,
+        "s was not rotated back onto s_ref (rel. err {s_err:.3e})"
+    );
 
     // 2. THE SIGN: A must absorb the inverse rotation, so the product is invariant.
     //    With the sign flipped this is the dominant failure - the product is rotated by

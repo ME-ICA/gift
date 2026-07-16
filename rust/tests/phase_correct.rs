@@ -24,8 +24,14 @@ fn correct_phase_matches_python_elementwise() {
             theta_py[(0, k)]
         );
     }
-    assert!((&s - &s_py).norm() / s_py.norm() < 1e-10, "S diverged from Python");
-    assert!((&a - &a_py).norm() / a_py.norm() < 1e-10, "A diverged from Python");
+    assert!(
+        (&s - &s_py).norm() / s_py.norm() < 1e-10,
+        "S diverged from Python"
+    );
+    assert!(
+        (&a - &a_py).norm() / a_py.norm() < 1e-10,
+        "A diverged from Python"
+    );
 }
 
 #[test]
@@ -60,5 +66,8 @@ fn align_to_reference_matches_python_and_collapses_known_rotations() {
             theta_py[(0, k)]
         );
     }
-    assert!((&s - &s_py).norm() / s_py.norm() < 1e-10, "aligned S diverged from Python");
+    assert!(
+        (&s - &s_py).norm() / s_py.norm() < 1e-10,
+        "aligned S diverged from Python"
+    );
 }

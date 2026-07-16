@@ -63,7 +63,9 @@ pub fn run_from_files(
         match dims3 {
             None => dims3 = Some(this),
             Some(prev) if prev != this => {
-                return Err(format!("subjects disagree on volume shape: {prev:?} vs {this:?}"))
+                return Err(format!(
+                    "subjects disagree on volume shape: {prev:?} vs {this:?}"
+                ))
             }
             _ => {}
         }

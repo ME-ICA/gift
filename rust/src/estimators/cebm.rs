@@ -48,7 +48,10 @@ pub(crate) struct Rng(u64);
 
 impl Rng {
     pub(crate) fn new(seed: u64) -> Self {
-        Rng(seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407) | 1)
+        Rng(seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407)
+            | 1)
     }
     /// uniform in [0, 1)
     pub(crate) fn next_f64(&mut self) -> f64 {
@@ -106,9 +109,7 @@ pub(crate) fn inv_sqrtm_h(b: &DMatrix<Complex64>) -> DMatrix<Complex64> {
 
 /// MATLAB `pre_processing`: remove DC, then whiten by inv_sqrtmH(X X^H / T).
 /// Returns (whitened X, the whitener P).
-pub(crate) fn pre_processing(
-    x: &DMatrix<Complex64>,
-) -> (DMatrix<Complex64>, DMatrix<Complex64>) {
+pub(crate) fn pre_processing(x: &DMatrix<Complex64>) -> (DMatrix<Complex64>, DMatrix<Complex64>) {
     let t = x.ncols();
     let mut xc = x.clone();
     for mut row in xc.row_iter_mut() {
@@ -208,12 +209,7 @@ fn standardize(z: &DVector<Complex64>, t: usize) -> Stand {
     let sigma_r2 = z_real.iter().map(|r| r * r).sum::<f64>() / tf;
     let sigma_i2 = z_imag.iter().map(|r| r * r).sum::<f64>() / tf;
     let sigma_r = sigma_r2.sqrt();
-    let rho = z_real
-        .iter()
-        .zip(&z_imag)
-        .map(|(r, i)| r * i)
-        .sum::<f64>()
-        / tf;
+    let rho = z_real.iter().zip(&z_imag).map(|(r, i)| r * i).sum::<f64>() / tf;
     let delta1 = sigma_r2 * sigma_i2 - rho * rho;
     let sqrt_d1 = delta1.sqrt();
     let u: Vec<f64> = z_real.iter().map(|r| r / sigma_r).collect();
@@ -297,10 +293,21 @@ fn bounds(nf: &[Nf; 8], x: &[f64], t: usize) -> Bounds {
         / tf;
     ne[4] = ne_bound_slope(&nf[4], eg[4]);
     // G7 = x/(1+x^2)  (nf7 -> nf[6])
-    eg[6] = x.iter().zip(&xx).map(|(xv, xxv)| xv / (1.0 + xxv)).sum::<f64>() / tf;
+    eg[6] = x
+        .iter()
+        .zip(&xx)
+        .map(|(xv, xxv)| xv / (1.0 + xxv))
+        .sum::<f64>()
+        / tf;
     ne[6] = ne_bound_slope(&nf[6], eg[6]);
 
-    Bounds { ne, eg, xx, sign, abs }
+    Bounds {
+        ne,
+        eg,
+        xx,
+        sign,
+        abs,
+    }
 }
 
 /// First-max argmax (numpy semantics: ties resolve to the lowest index).
@@ -315,12 +322,7 @@ fn argmax(a: &[f64]) -> usize {
 }
 
 /// The "sea" fixed-point algorithm that provides the initial guess (CEBM:55-221).
-fn sea(
-    xc: &DMatrix<Complex64>,
-    nf: &[Nf; 8],
-    rng: &mut Rng,
-    tolerance: f64,
-) -> DMatrix<Complex64> {
+fn sea(xc: &DMatrix<Complex64>, nf: &[Nf; 8], rng: &mut Rng, tolerance: f64) -> DMatrix<Complex64> {
     let maxiter_sea = 100usize;
     let max_cost_increase_number = 10usize;
     let (n, t) = xc.shape();
@@ -452,8 +454,8 @@ fn north(
                     let iq = inv_q.as_ref().unwrap();
                     let temp1 = iq * &c;
                     let temp2: DVector<Complex64> = iq.column(n_last).into_owned();
-                    let inv_q_plus =
-                        iq - (&temp1 * temp2.adjoint()) / (Complex64::new(1.0, 0.0) + temp1[n_last]);
+                    let inv_q_plus = iq
+                        - (&temp1 * temp2.adjoint()) / (Complex64::new(1.0, 0.0) + temp1[n_last]);
 
                     let temp1b = inv_q_plus.adjoint() * &c;
                     let temp2b: DVector<Complex64> = inv_q_plus.column(n_last).into_owned();
@@ -718,15 +720,7 @@ pub fn cebm(
 
     // stochastic gradient search. The reference's "refinement" pass (complex_ICA_EBM.m:241)
     // is commented out there, so it is not run here either.
-    let w_north = north(
-        &xc,
-        &w_init,
-        max_iter_north,
-        1.0 / 5.0,
-        5,
-        &nf,
-        &mut rng,
-    )?;
+    let w_north = north(&xc, &w_init, max_iter_north, 1.0 / 5.0, 5, &nf, &mut rng)?;
 
     // fold the pre-whitener back in: W now demixes the original X
     let w = w_north * p;

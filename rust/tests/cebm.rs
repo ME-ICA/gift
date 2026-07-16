@@ -10,7 +10,10 @@ fn is_reproducible_for_a_fixed_seed() {
     let cx = load_c64("cX");
     let a = cebm(&cx, &fixtures_dir(), 0, 1e-4, None).expect("cebm");
     let b = cebm(&cx, &fixtures_dir(), 0, 1e-4, None).expect("cebm");
-    assert!((&a.w - &b.w).norm() < 1e-12, "same seed must give the same W");
+    assert!(
+        (&a.w - &b.w).norm() < 1e-12,
+        "same seed must give the same W"
+    );
 }
 
 #[test]
@@ -24,7 +27,10 @@ fn pseudo_cov_uses_the_plain_transpose() {
     let want_plain = (&x * x.transpose()) / Complex64::new(t, 0.0);
     let want_conj = (&x * x.adjoint()) / Complex64::new(t, 0.0);
 
-    assert!((&got - &want_plain).norm() < 1e-9, "pseudo-cov must use the PLAIN transpose");
+    assert!(
+        (&got - &want_plain).norm() < 1e-9,
+        "pseudo-cov must use the PLAIN transpose"
+    );
     assert!(
         (&got - &want_conj).norm() > 1e-3,
         "pseudo-cov must NOT be the Hermitian covariance"
@@ -77,12 +83,14 @@ fn separates_at_n_10_exercising_the_incremental_branch() {
             s[(i, j)] = Complex64::new(re, im);
         }
     }
-    let a_mix = DMatrix::<Complex64>::from_fn(n, n, |_, _| {
-        Complex64::new(rng.normal(), rng.normal())
-    });
+    let a_mix =
+        DMatrix::<Complex64>::from_fn(n, n, |_, _| Complex64::new(rng.normal(), rng.normal()));
     let x = &a_mix * &s;
 
     let res = cebm(&x, &fixtures_dir(), 0, 1e-4, None).expect("cebm at n=10");
     let isi_rust = isi(&(&res.w * &a_mix));
-    assert!(isi_rust < 0.05, "n=10 (incremental branch) ISI={isi_rust:.5}");
+    assert!(
+        isi_rust < 0.05,
+        "n=10 (incremental branch) ISI={isi_rust:.5}"
+    );
 }

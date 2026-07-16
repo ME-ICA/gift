@@ -33,8 +33,8 @@ pub struct Nf {
 }
 
 fn read_npy_f64(path: &Path) -> (Vec<f64>, Vec<usize>, npyz::Order) {
-    let bytes = std::fs::read(path)
-        .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
+    let bytes =
+        std::fs::read(path).unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
     let npy = npyz::NpyFile::new(&bytes[..]).expect("valid .npy");
     let shape: Vec<usize> = npy.shape().iter().map(|&d| d as usize).collect();
     let order = npy.order();
@@ -68,7 +68,11 @@ fn load_pp(dir: &Path, name: &str, which: &str) -> Pp {
             ],
         })
         .collect();
-    Pp { breaks, coefs, pieces }
+    Pp {
+        breaks,
+        coefs,
+        pieces,
+    }
 }
 
 pub fn load_nf_table(dir: &Path) -> [Nf; 8] {

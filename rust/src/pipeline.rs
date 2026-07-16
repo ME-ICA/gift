@@ -126,5 +126,10 @@ pub fn run_complex_ica(
         out.push((s_i, a_i));
     }
 
-    Ok(PipelineResult { s_group, a_group, mask, subjects: out })
+    Ok(PipelineResult {
+        s_group,
+        a_group,
+        mask,
+        subjects: out,
+    })
 }

@@ -112,9 +112,7 @@ pub fn match_sources(
         let (mut best_j, mut best) = (0usize, -1.0f64);
         for j in 0..t.nrows() {
             // |<e_i, t_j>| : conjugate one side (complex correlation modulus)
-            let dot: Complex64 = (0..e.ncols())
-                .map(|k| e[(i, k)] * t[(j, k)].conj())
-                .sum();
+            let dot: Complex64 = (0..e.ncols()).map(|k| e[(i, k)] * t[(j, k)].conj()).sum();
             let m = dot.norm();
             if m > best {
                 best = m;
@@ -133,7 +131,11 @@ pub struct TestRng(u64);
 
 impl TestRng {
     pub fn new(seed: u64) -> Self {
-        TestRng(seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407) | 1)
+        TestRng(
+            seed.wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407)
+                | 1,
+        )
     }
     /// uniform in [0, 1)
     pub fn uniform(&mut self) -> f64 {

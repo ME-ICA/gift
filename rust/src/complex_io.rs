@@ -35,7 +35,11 @@ fn read_volume(path: &Path) -> Result<(Vec<f64>, [usize; 4]), String> {
     // raw on-disk NIfTI layout. Convert to standard (C, last-axis-fastest) layout before
     // flattening so the returned Vec enumerates voxels in the same order callers (and the
     // fixtures) expect: index = i*(ny*nz) + j*nz + k for dims [nx, ny, nz].
-    let data: Vec<f64> = arr.as_standard_layout().into_owned().into_raw_vec_and_offset().0;
+    let data: Vec<f64> = arr
+        .as_standard_layout()
+        .into_owned()
+        .into_raw_vec_and_offset()
+        .0;
     Ok((data, dims))
 }
 
@@ -127,10 +131,7 @@ pub fn write_complex_like(
 }
 
 /// Derive GIFT's two filenames from a base name (a prefix around an underscore).
-pub fn complex_file_pair(
-    path: &Path,
-    naming: (&str, &str),
-) -> Result<(PathBuf, PathBuf), String> {
+pub fn complex_file_pair(path: &Path, naming: (&str, &str)) -> Result<(PathBuf, PathBuf), String> {
     let name = path
         .file_name()
         .and_then(|s| s.to_str())
