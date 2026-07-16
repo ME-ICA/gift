@@ -87,10 +87,38 @@ pub fn run_complex_ica(
         }
         off += s.nrows();
     }
-    let (mask, _q, _tau) = phase_quality_mask(&z, None);
+    let (mask, q, _tau) = phase_quality_mask(&z, None);
+
+    // Otsu needs two modes to separate. If Q has no meaningful spread, the threshold falls
+    // on floating-point noise and the mask it returns is arbitrary - it will discard
+    // genuine signal voxels while looking entirely plausible. Refuse instead, matching
+    // Python, whose skimage.threshold_otsu raises ("Too many bins for data range") on the
+    // same input. Silently inventing a mask is the worse failure mode, and no array-level
+    // test downstream can see it.
+    let q_lo = q.iter().copied().fold(f64::INFINITY, f64::min);
+    let q_hi = q.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    if !(q_hi - q_lo > 1e-9 * q_hi.abs().max(1.0)) {
+        return Err(format!(
+            "run_complex_ica: the phase-quality map is degenerate (Q spans [{q_lo:.6e}, \
+             {q_hi:.6e}]); Otsu cannot separate a mask from it and would threshold on \
+             numerical noise. Every voxel has effectively the same phase stability."
+        ));
+    }
 
     // 2. restrict every subject to the masked voxels
     let kept: Vec<usize> = (0..v).filter(|&j| mask[j]).collect();
+    // An empty (or near-empty) mask is a data problem, not a bug, and this function's
+    // contract is `Result` - it must not abort the caller. Without this guard, degenerate
+    // input (e.g. an exactly constant phase-quality map, which drives Otsu's threshold to
+    // the single Q value so nothing exceeds it) reaches whiten_hermitian and panics.
+    if kept.len() < n_components {
+        return Err(format!(
+            "run_complex_ica: the phase-quality mask kept {} of {v} voxels, fewer than the \
+             {n_components} components requested. The data may have no phase-stable voxels, \
+             or the quality map may be degenerate (constant Q).",
+            kept.len()
+        ));
+    }
     let masked: Vec<DMatrix<Complex64>> = subjects
         .iter()
         .map(|s| {

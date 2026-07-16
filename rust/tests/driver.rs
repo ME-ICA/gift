@@ -293,7 +293,10 @@ fn written_maps_inherit_the_input_geometry() {
         ..Default::default()
     };
 
-    // phase-stable signal everywhere, so the mask keeps voxels and the pipeline runs
+    // Most voxels phase-stable, the last few random-phase. The noise voxels are what give
+    // the quality map a real dynamic range: with EVERY voxel phase-stable, Q is constant at
+    // 1.0 and the pipeline (correctly) refuses, because Otsu would be thresholding noise.
+    let v_sig = v - 6;
     let phi: Vec<f64> = (0..v)
         .map(|_| (rng.uniform() * 20.0 - 10.0) / 180.0 * std::f64::consts::PI)
         .collect();
@@ -303,10 +306,17 @@ fn written_maps_inherit_the_input_geometry() {
         let mut im = ndarray::Array4::<f64>::zeros((dims[0], dims[1], dims[2], t));
         for tt in 0..t {
             for (vv, &ph) in phi.iter().enumerate() {
-                let mag = 100.0
-                    + 10.0 * rng.uniform()
-                    + 5.0 * (rng.normal() * rng.normal().abs().powf(1.5));
-                let z = Complex64::new(mag, 0.0) * Complex64::new(ph.cos(), ph.sin());
+                let z = if vv < v_sig {
+                    let mag = 100.0
+                        + 10.0 * rng.uniform()
+                        + 5.0 * (rng.normal() * rng.normal().abs().powf(1.5));
+                    Complex64::new(mag, 0.0) * Complex64::new(ph.cos(), ph.sin())
+                } else {
+                    // random phase per timepoint -> phase-unstable
+                    let ang = std::f64::consts::TAU * rng.uniform();
+                    let mag = 0.5 + rng.uniform();
+                    Complex64::new(mag * ang.cos(), mag * ang.sin())
+                };
                 let (x, y, zc) = (
                     vv / (dims[1] * dims[2]),
                     (vv / dims[2]) % dims[1],

@@ -280,3 +280,55 @@ fn ragged_subjects_are_rejected() {
         .expect_err("no subjects must be rejected");
     assert!(err.contains("no subjects"), "unhelpful error: {err}");
 }
+
+/// A degenerate mask must be a clean Err, never a panic: `run_complex_ica` returns
+/// `Result`, so aborting the caller violates its own contract. An exactly constant
+/// phase-quality map drives Otsu's threshold to the single Q value, so no voxel exceeds it
+/// and the mask keeps NOTHING; that used to reach whiten_hermitian and panic at
+/// `whiten.rs:42` ("eigenvalues are real and finite"). Python raises a catchable error here.
+#[test]
+fn a_degenerate_mask_is_an_error_not_a_panic() {
+    let (t, v) = (20usize, 50usize);
+    // identical phase in every voxel => Q is exactly constant
+    let subs: Vec<DMatrix<Complex64>> = (0..2)
+        .map(|_| DMatrix::<Complex64>::from_fn(t, v, |tt, _| Complex64::new(1.0 + tt as f64, 0.0)))
+        .collect();
+
+    let err = run_complex_ica(&subs, 2, None, Estimator::NcFastica, &fixtures_dir())
+        .expect_err("a degenerate quality map must be rejected, not panic");
+    assert!(
+        err.contains("degenerate"),
+        "error should name the cause: {err}"
+    );
+}
+
+/// The case the empty-mask guard CANNOT see, and the reason the degenerate-Q check exists
+/// separately: when Q is near-constant (not exactly constant), Otsu still returns a
+/// threshold and the mask still keeps plenty of voxels - it just picks them by
+/// floating-point noise. Measured here: Q spans 8.9e-16 yet the mask keeps 79 of 120
+/// voxels, silently discarding 41 genuine ones. Python refuses this input
+/// (skimage.threshold_otsu raises "Too many bins for data range"); Rust must too, or the
+/// two ports are not interchangeable and the divergence is invisible to every array-level
+/// test.
+#[test]
+fn a_near_constant_quality_map_is_rejected_not_thresholded_on_noise() {
+    let (t, v) = (20usize, 120usize);
+    let mut rng = TestRng::new(7);
+    // phase-stable, but with a minuscule per-timepoint jitter: Q lands within ~1e-15 of 1.0
+    // for every voxel, so there are no two modes to separate.
+    let subs: Vec<DMatrix<Complex64>> = (0..2)
+        .map(|_| {
+            DMatrix::<Complex64>::from_fn(t, v, |_, vv| {
+                let phi = 0.01 * vv as f64 + 1e-7 * rng.uniform();
+                Complex64::new(phi.cos(), phi.sin())
+            })
+        })
+        .collect();
+
+    let err = run_complex_ica(&subs, 2, None, Estimator::NcFastica, &fixtures_dir())
+        .expect_err("a near-constant quality map must be rejected");
+    assert!(
+        err.contains("degenerate"),
+        "error should name the cause: {err}"
+    );
+}
