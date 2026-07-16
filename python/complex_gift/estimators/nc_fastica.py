@@ -46,6 +46,19 @@ def _g_gp(nonlinearity, absy):
     return g, gp
 
 
+def resolve_max_iter(max_iter, n):
+    """Resolve the iteration cap.
+
+    MATLAB's ``maxcounter = 50`` is DEAD CODE; the reference's real loop bound is
+    ``15 * n`` (nonCircComplexFastICAsym.m line 60). ``None`` therefore resolves to
+    ``15 * n``, NOT 50.
+
+    Split out so the default is directly assertable: realistic fixtures converge long
+    before either cap bites, so comparing OUTPUTS cannot tell 50 from 15*n.
+    """
+    return 15 * n if max_iter is None else max_iter
+
+
 def nc_fastica(X, nonlinearity="log", tol=1e-5, max_iter=None):
     """Noncircular complex FastICA, symmetric orthogonalization.
 
@@ -65,9 +78,7 @@ def nc_fastica(X, nonlinearity="log", tol=1e-5, max_iter=None):
     xold = np.asarray(X, dtype=np.complex128)
     n, m = xold.shape
 
-    # Resolve max_iter: default to 15*n to match the MATLAB reference's effective cap.
-    if max_iter is None:
-        max_iter = 15 * n
+    max_iter = resolve_max_iter(max_iter, n)
 
     # Whitening: eig(cov(xold')) in MATLAB. MATLAB's cov() computes the
     # CONJUGATE (Hermitian) covariance with N-1 normalization; np.cov matches

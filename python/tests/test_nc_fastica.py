@@ -2,7 +2,7 @@ import numpy as np
 from scipy.io import loadmat
 
 from complex_gift.estimators import get_estimator
-from complex_gift.estimators.nc_fastica import nc_fastica
+from complex_gift.estimators.nc_fastica import nc_fastica, resolve_max_iter
 from oracle import isi, match_sources
 
 
@@ -52,31 +52,20 @@ def test_matches_matlab_oracle_on_the_shared_fixture(fixtures_dir, sources):
     assert np.all(corr > 0.9)
 
 
-def test_default_max_iter_matches_reference_cap():
-    """Verify default max_iter=None reproduces MATLAB's effective cap of 15*n.
+def test_default_max_iter_resolves_to_the_reference_cap():
+    """The default cap must be 15*n, not MATLAB's dead maxcounter=50.
 
-    The MATLAB reference has a dead local maxcounter=50, but its actual loop
-    bound is 15*n. The default must use 15*n, not 50. This test verifies that
-    max_iter=None and max_iter=15*n produce identical results for N=4
-    (where 15*4=60 != 50, catching any regression to the old default).
+    Assert the RESOLUTION, not the outputs. Realistic fixtures converge in ~16
+    iterations, so neither 50 nor 15*n ever bites and comparing W from max_iter=None
+    against max_iter=15*n passes even when the default is wrong. (Verified: reverting
+    the default to 50 left the old output-comparison test green.) This mirrors the
+    Rust port's resolve_max_iter test.
     """
-    rng = np.random.default_rng(42)
-    N, T = 4, 1000  # 4 components: 15*4=60 != 50
-    re = rng.standard_normal((N, T)) * np.abs(rng.standard_normal((N, T))) ** 1.5
-    im = rng.standard_normal((N, T)) * np.abs(rng.standard_normal((N, T))) ** 1.5
-    X = re + 1j * 0.3 * im
-    Amix = rng.standard_normal((N, N)) + 1j * rng.standard_normal((N, N))
-    X = Amix @ X
+    assert resolve_max_iter(None, 6) == 90
+    assert resolve_max_iter(None, 4) == 60
+    assert resolve_max_iter(None, 2) == 30
+    # an explicit value always wins, including one that differs from both caps
+    assert resolve_max_iter(7, 6) == 7
+    assert resolve_max_iter(50, 4) == 50
 
-    # Call with max_iter=None (default, should use 15*4=60 internally)
-    res_default = nc_fastica(X, nonlinearity="log", max_iter=None)
 
-    # Call with explicit max_iter=15*N (should produce identical results)
-    res_explicit = nc_fastica(X, nonlinearity="log", max_iter=15 * N)
-
-    # Both must produce identical W. This verifies that max_iter=None correctly
-    # uses 15*n. If someone reverts to max_iter=50, this test would fail
-    # because the explicit 15*N call would allow more iterations than 50.
-    assert np.allclose(res_default.W, res_explicit.W, atol=1e-12), (
-        "max_iter=None and max_iter=15*n should produce identical W"
-    )
