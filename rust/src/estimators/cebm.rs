@@ -3,7 +3,7 @@
 //! Ported from GroupICAT/icatb/icatb_analysis_functions/icatb_algorithms/complex_ica/
 //! complex_ICA_EBM.m (functions `CEBM`, `complex_ICA_EBM_north`, `pre_processing` and
 //! `inv_sqrtmH`), by way of the validated Python translation at
-//! python/complex_gift/estimators/cebm.py. The Python is the authority: it was validated
+//! python/src/gift/estimators/cebm.py. The Python is the authority: it was validated
 //! against MATLAB on separation quality (ISI 0.0055 vs MATLAB 0.0075 across 15 seeds).
 //! Where Python and MATLAB appear to differ, this port follows the Python.
 //!

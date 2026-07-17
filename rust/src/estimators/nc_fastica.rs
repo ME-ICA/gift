@@ -2,7 +2,7 @@
 //!
 //! Ported from GroupICAT/icatb/icatb_analysis_functions/icatb_algorithms/complex_ica/
 //! nonCircComplexFastICAsym.m, by way of the validated Python translation at
-//! python/complex_gift/estimators/nc_fastica.py.
+//! python/src/gift/estimators/nc_fastica.py.
 //!
 //! Reference:
 //!     Mike Novey and T. Adali, "On Extending the complex FastICA algorithm to

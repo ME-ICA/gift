@@ -11,7 +11,7 @@
 //! deterministic estimator, where the two agree to ~4e-14 once matched up. Match components
 //! by correlation, never by filename.
 //!
-//! Mirrors `python/complex_gift/driver.py`; the two ports are meant to be interchangeable.
+//! Mirrors `python/src/gift/driver.py`; the two ports are meant to be interchangeable.
 //! Python's `unmask` returns an `(N, *dims)` array where this returns `N` flat volumes -
 //! idiomatic per language, but the voxel ORDER is identical.
 
