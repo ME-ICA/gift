@@ -28,7 +28,7 @@ complex ICA algorithms).
 | **Port scope** | Complex ICA + *minimal runnable GIFT* | Ports run a full complex **group** analysis end-to-end (data reduction → complex ICA → back-recon → NIfTI outputs). **Excluded:** GUI, dFNC/dFC, MANCOVA, display/rendering, real-valued ICA. |
 | **Estimators** | **CEBM + nc-FastICA**, behind a swappable interface | Two independent estimators cross-check the pipeline. (Both whiten internally; see the correction under §4 — neither uses the SUT.) |
 | **Sequencing** | **MATLAB → Python → Rust** | Each stage is the numeric oracle for the next; lowest risk. |
-| **Phase-step validation** | Property-based + synthetic-injection, identical assertions in all three targets | The phase steps have no reference implementation to diff against; prove properties instead. |
+| **Phase-step validation** | Property-based + synthetic-injection, identical assertions in all three targets | ~~The phase steps have no reference implementation to diff against; prove properties instead.~~ **Premise corrected — see the second correction under §4.** The Complex GIFT toolbox (linked from the repo root README) *does* ship reference implementations of both phase steps; they were simply not consulted at spec time. |
 | **Group scheme** | GIFT default: temporal concatenation → two-stage (subject then group) complex PCA → GICA back-reconstruction | Keeps "minimal runnable" faithful to GIFT without pulling in other back-recon variants. |
 
 ## 3. Architecture — one roadmap, three sub-projects
@@ -60,11 +60,11 @@ defined interface.
 | Unit | Input → Output | Notes |
 |---|---|---|
 | `complex_io` | 2 files/volume → complex 4-D array | R_/I_, Mag_/Phase_ (ref §2) |
-| `phase_mask` | complex `(V×T)` → boolean mask | quality map `Q(v)` + Otsu (ref §3); **property-tested** |
+| `phase_mask` | complex `(V×T)` → boolean mask | temporal quality map `Q(v)` + Otsu (default); **plus** a faithful port of GIFT's spatial PDV mask — see 2nd correction below |
 | `preproc` | complex `(V×T)` → de-meaned `(V×T)` | remove-mean only; magnitude-safe norms (ref §5) |
 | `whiten` | `(V×T)` → reduced `(N×T)`, W_wh, W_dw | Hermitian **or** SUT (ref §6), selected by estimator |
 | `estimator` | `(N×T)` → W, A, S | **swappable**: `cebm` \| `nc_fastica` (ref §7) |
-| `phase_correct` | S, A, mask → rotated S, A | closed-form θ + π-sign (ref §8); **property-tested** |
+| `phase_correct` | S, A, mask → rotated S, A | closed-form θ + π-sign; verified **equivalent** to GIFT's `icatb_PCA_phase_correction.m` — see 2nd correction below |
 | `group` | per-subject reduced data → group W, back-recon | two-stage complex PCA + GICA back-recon + align (ref §7b, §9) |
 | `nf_table` | — | loaded from shared CSV/npy export (ref §12.0) |
 
@@ -81,6 +81,40 @@ So the units are in fact **fully decoupled**: `whiten` is used by the *group red
 correct, tested, degeneracy-safe public utility for noncircular work, but **no estimator
 currently calls it** — do not assume it is on the hot path.
 Everything else is a clean data hand-off.
+
+**Second correction (established post-Phase-3 — the "no reference implementation" premise
+was wrong):** the decision table above claimed the phase steps had no reference to diff
+against, so both were validated by properties alone. That premise was false. The **Complex
+GIFT** toolbox (`GroupICATv2.0d_complex`, linked from the repo-root README all along)
+ships MATLAB implementations of both, authored by Pedro A. Rodriguez:
+
+- **Phase-quality mask** — `icatb_preproc_complex_data.m` → `icatb_qmpd.m` →
+  `icatb_val_qual_circular.m` → `icatb_qmpd_quality_mask_run.m`. This is a **spatial
+  phase-derivative variance (PDV)** map (Rodriguez et al. 2011): local variance of wrapped
+  phase gradients within each 2-D slice, keep-low at a fixed 0.2 threshold, ANDed over
+  time, morphologically opened per slice, then combined across subjects by an 80% vote.
+  This is **not** the algorithm originally ported. `phase_mask.py` shipped a *temporal*
+  coherence measure (`|Σ Zₜ| / Σ|Zₜ|` + Otsu), derived from the paper's description rather
+  than its code — a different physical quantity. **Resolution:** both are now offered via
+  `phase_quality_mask(..., method=)`. `'temporal'` remains the default; `'pdv'` is a
+  faithful port, verified to ~1e-15 against a literal transcription of the MATLAB. The one
+  unverified step is the per-slice morphological opening (`skimage` disk vs. MATLAB
+  `strel('disk')`), which is documented and disable-able.
+- **Phase-ambiguity correction** — `icatb_PCA_phase_correction.m`. Its rotation
+  (`-atan2(COEFF(2,1), COEFF(1,1))` from an SVD of `[real, imag]`) is **mathematically
+  equivalent** to the port's closed form `-0.5·angle(Σ s²)`; verified to ~1e-15. The only
+  divergence is the 180° flip criterion — GIFT uses raw `sum(x³)`, the port uses
+  mean-centered `scipy.stats.skew`. These are provably sign-identical for zero-mean input,
+  and the sources reaching `correct_phase` are zero-mean to ~1e-17 (whitening centers over
+  voxels), so the difference is **latent** in the pipeline, reachable only by calling
+  `correct_phase` directly on non-centered maps.
+
+Two smaller notes from the same comparison: (1) `icatb_complex_ICA_EBM.m`'s
+`pre_processing` uses **Hermitian** whitening (`inv_sqrtmH(X*X'/T)`), confirming the first
+correction above — no SUT. (2) GIFT's complex file naming differs between read and write
+(`READ_NAMING_COMPLEX_IMAGES` is a *suffix*, `_R`/`_I`, `_CM`/`_CP`; `WRITE_` is a
+*prefix*, `R_`/`I_`, `Mag_`/`Phase_`); the port's `read_complex` takes explicit paths and
+is naming-agnostic, and its docstrings have been corrected to state the read/write split.
 
 ## 5. Track 1 — MATLAB-in-GIFT (the oracle)
 
@@ -148,8 +182,11 @@ Two mechanisms, because the pipeline has two kinds of units:
   to permutation + per-source complex phase/scale (match by max complex correlation, then
   ISI at tight tolerance). Diff the `nf_table` export **pointwise first** — the most likely
   silent divergence.
-- **Property / synthetic-injection** (phase steps — no ground truth): identical assertions
-  in all three languages —
+- **Property / synthetic-injection** (phase steps): identical assertions in all three
+  languages. (Originally justified by "no ground truth"; that was wrong — see the second
+  correction under §4. Complex GIFT provides a reference, and the Python port now diffs
+  the PDV mask and phase correction against transcriptions of it in addition to the
+  property tests below.) —
   - `phase_mask`: invariant to a constant per-voxel phase offset, `mask(z) == mask(z·e^{jφ})`
   - `phase_correct`: inject known rotation θ, assert recovery of −θ; assert `‖X − A·S‖`
     unchanged
