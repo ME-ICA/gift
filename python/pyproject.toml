@@ -1,5 +1,5 @@
 [project]
-name = "complex-gift"
+name = "gift"
 version = "0.1.0"
 description = "Complex-valued fMRI ICA - Python port of GIFT's complex ICA pipeline"
 requires-python = ">=3.11"
@@ -11,13 +11,80 @@ dependencies = [
     "scikit-image>=0.22",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "ruff ~= 0.15.0",
+]
+tests = [
+    "pytest",
+]
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["complex_gift*"]
+where = ["src"]
+include = ["gift*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+#
+# Developer tool configurations
+#
+
+[tool.ruff]
+line-length = 99
+
+[tool.ruff.lint]
+extend-select = [
+  "I",
+  "UP",
+  "YTT",
+  "S",
+  "BLE",
+  "B",
+  "A",
+  "C4",
+  "DTZ",
+  "T10",
+  "EXE",
+  "FA",
+  "ISC",
+  "ICN",
+  "LOG",
+  "PIE",
+  "PYI",
+  "PT",
+  "Q",
+  "FLY",
+  "PERF",
+  "W",
+  "PGH",
+  "PLC",
+  "PLE",
+  "PLW",
+  "FURB",
+  "RUF",
+]
+ignore = [
+  "S311",  # We are not using random for cryptographic purposes
+  "S603",
+  "PIE790",
+  "PERF203",
+  "PLC0415",
+  "PLW2901",
+  "RUF005",
+  "RUF012",
+]
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "single"
+
+[tool.ruff.lint.extend-per-file-ignores]
+"*/test_*.py" = ["S101"]
+"*/conftest.py" = ["S101"]
+
+[tool.ruff.format]
+quote-style = "single"

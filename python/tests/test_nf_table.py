@@ -2,17 +2,17 @@ import numpy as np
 import pytest
 from scipy.interpolate import PPoly
 
-from complex_gift.nf_table import export_nf_table, load_nf_table, simplified_ppval
+from gift.nf_table import export_nf_table, load_nf_table, simplified_ppval
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope='module')
 def nf(fixtures_dir):
-    return load_nf_table(fixtures_dir / "nf_table.mat")
+    return load_nf_table(fixtures_dir / 'nf_table.mat')
 
 
 def test_structure(nf):
-    assert sorted(nf) == [f"nf{i}" for i in range(1, 9)]
-    for k, v in nf.items():
+    assert sorted(nf) == [f'nf{i}' for i in range(1, 9)]
+    for v in nf.values():
         assert v.pp.coefs.shape == (v.pp.pieces, 4)
         assert v.pp.breaks.shape == (v.pp.pieces + 1,)
         assert v.pp.order == 4
@@ -38,23 +38,23 @@ def test_ppval_matches_scipy_ppoly(nf):
 def test_ppval_clamps_outside_breaks(nf):
     """Outside the knot range MATLAB's evaluator extrapolates from the end piece
     (index clamped to first/last), rather than raising."""
-    pp = nf["nf1"].pp
+    pp = nf['nf1'].pp
     assert np.isfinite(simplified_ppval(pp, float(pp.breaks[0] - 5.0)))
     assert np.isfinite(simplified_ppval(pp, float(pp.breaks[-1] + 5.0)))
 
 
 def test_export_npz_roundtrip(nf, fixtures_dir, tmp_path):
-    out = tmp_path / "nf_table.npz"
-    export_nf_table(fixtures_dir / "nf_table.mat", out)
+    out = tmp_path / 'nf_table.npz'
+    export_nf_table(fixtures_dir / 'nf_table.mat', out)
     d = np.load(out)
     for name, v in nf.items():
-        assert np.array_equal(d[f"{name}/pp/breaks"], v.pp.breaks)
-        assert np.array_equal(d[f"{name}/pp/coefs"], v.pp.coefs)
-        assert np.array_equal(d[f"{name}/pp_slope/coefs"], v.pp_slope.coefs)
-        assert float(d[f"{name}/min_EGx"]) == v.min_EGx
+        assert np.array_equal(d[f'{name}/pp/breaks'], v.pp.breaks)
+        assert np.array_equal(d[f'{name}/pp/coefs'], v.pp.coefs)
+        assert np.array_equal(d[f'{name}/pp_slope/coefs'], v.pp_slope.coefs)
+        assert float(d[f'{name}/min_EGx']) == v.min_EGx
         # Handle NaN comparison: if both are NaN, they match
-        cp2_exported = float(d[f"{name}/critical_point2"])
+        cp2_exported = float(d[f'{name}/critical_point2'])
         if np.isnan(v.critical_point2):
-            assert np.isnan(cp2_exported), f"{name} critical_point2 mismatch"
+            assert np.isnan(cp2_exported), f'{name} critical_point2 mismatch'
         else:
             assert cp2_exported == v.critical_point2

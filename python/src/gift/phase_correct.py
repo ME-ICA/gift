@@ -33,7 +33,7 @@ def correct_phase(S, A, mask=None):
     theta = np.zeros(N, dtype=np.float64)
     for k in range(N):
         sm = S[k, mask]
-        th = -0.5 * np.angle(np.sum(sm**2))     # orient the major axis to the real axis
+        th = -0.5 * np.angle(np.sum(sm**2))  # orient the major axis to the real axis
         sk = S[k] * np.exp(1j * th)
         # residual pi ambiguity: fix the direction by real-part skewness
         if skew(sk[mask].real) < 0:

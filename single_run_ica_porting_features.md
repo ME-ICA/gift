@@ -38,7 +38,7 @@ Explicit non-goals are:
 The current Python and Rust packages are useful foundations, but their top-level pipelines
 are group-complex-ICA pipelines. Python exposes a common estimator result containing
 `W`, `A`, and `S` in
-[`python/complex_gift/estimators/base.py`](python/complex_gift/estimators/base.py#L7-L16),
+[`python/src/gift/estimators/base.py`](python/src/gift/estimators/base.py#L7-L16),
 while the Rust equivalent is in
 [`rust/src/estimators/mod.rs`](rust/src/estimators/mod.rs#L7-L13). The proposed real-valued
 pipeline should preserve that contract while introducing a single-dataset entry point
@@ -329,7 +329,7 @@ Whitening and dewhitening are derived from the retained eigenvectors and eigenva
 
 The current Python and Rust ports already contain rank-checked Hermitian whitening for
 complex data
-([`python/complex_gift/whiten.py`](python/complex_gift/whiten.py#L13-L48),
+([`python/src/gift/whiten.py`](python/src/gift/whiten.py#L13-L48),
 [`rust/src/whiten.rs`](rust/src/whiten.rs#L14-L67)). The real implementation should reuse
 the same failure policy: reject a requested model order whose smallest retained eigenvalue
 is not comfortably positive relative to the largest.

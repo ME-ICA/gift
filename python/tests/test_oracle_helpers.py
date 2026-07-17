@@ -13,7 +13,7 @@ def test_isi_zero_for_identity_and_scaled_permutation():
 
 
 def test_isi_positive_for_mixed_matrix():
-    G = np.ones((4, 4), dtype=complex)   # maximally mixed
+    G = np.ones((4, 4), dtype=complex)  # maximally mixed
     assert isi(G) > 0.9
 
 

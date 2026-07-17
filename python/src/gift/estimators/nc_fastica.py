@@ -26,23 +26,23 @@ from .base import EstimatorResult
 from .cebm import _pseudo_cov
 
 _A2 = 0.05  # nonlinearity smoothing constant (reference: a2)
-_NONLINEARITIES = ("log", "kurt", "sqrt")
+_NONLINEARITIES = ('log', 'kurt', 'sqrt')
 
 
 def _g_gp(nonlinearity, absy):
     """Nonlinearity g and its "derivative-like" companion gp, per the reference."""
-    if nonlinearity == "log":
+    if nonlinearity == 'log':
         g = 1.0 / (_A2 + absy)
         gp = -1.0 / (_A2 + absy) ** 2
-    elif nonlinearity == "kurt":
+    elif nonlinearity == 'kurt':
         g = absy
         gp = np.ones_like(absy)
-    elif nonlinearity == "sqrt":
+    elif nonlinearity == 'sqrt':
         g = 1.0 / (2.0 * np.sqrt(_A2 + absy))
         gp = -1.0 / (4.0 * (_A2 + absy) ** 1.5)
     else:
         raise ValueError(
-            f"unknown nonlinearity {nonlinearity!r}; expected one of {_NONLINEARITIES}"
+            f'unknown nonlinearity {nonlinearity!r}; expected one of {_NONLINEARITIES}'
         )
     return g, gp
 
@@ -60,7 +60,7 @@ def resolve_max_iter(max_iter, n):
     return 15 * n if max_iter is None else max_iter
 
 
-def nc_fastica(X, nonlinearity="log", tol=1e-5, max_iter=None):
+def nc_fastica(X, nonlinearity='log', tol=1e-5, max_iter=None):
     """Noncircular complex FastICA, symmetric orthogonalization.
 
     X: (N, T) complex mixtures. Fully deterministic (the reference has no
@@ -73,11 +73,11 @@ def nc_fastica(X, nonlinearity="log", tol=1e-5, max_iter=None):
     """
     if nonlinearity not in _NONLINEARITIES:
         raise ValueError(
-            f"unknown nonlinearity {nonlinearity!r}; expected one of {_NONLINEARITIES}"
+            f'unknown nonlinearity {nonlinearity!r}; expected one of {_NONLINEARITIES}'
         )
 
     xold = np.asarray(X, dtype=np.complex128)
-    n, m = xold.shape
+    n, _m = xold.shape
 
     max_iter = resolve_max_iter(max_iter, n)
 
@@ -105,8 +105,7 @@ def nc_fastica(X, nonlinearity="log", tol=1e-5, max_iter=None):
     # Convergence condition: loop while orthonormality deviation exceeds threshold
     # AND iteration count is within the limit (max_iter, which defaults to 15*n).
     while (
-        np.linalg.norm(np.abs(Wold.conj().T @ W) - np.eye(n), "fro") > (n * tol)
-        and k < max_iter
+        np.linalg.norm(np.abs(Wold.conj().T @ W) - np.eye(n), 'fro') > (n * tol) and k < max_iter
     ):
         k += 1
         Wold = W.copy()

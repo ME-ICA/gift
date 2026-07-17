@@ -43,9 +43,8 @@ import numpy as np
 from ..nf_table import load_nf_table, simplified_ppval
 from .base import EstimatorResult
 
-_DEFAULT_NF_TABLE = (
-    Path(__file__).resolve().parents[3] / "complex_ica_fixtures" / "nf_table.mat"
-)
+# parents[4] walks src/gift/estimators/ -> src/ -> python/ -> the repo root.
+_DEFAULT_NF_TABLE = Path(__file__).resolve().parents[4] / 'complex_ica_fixtures' / 'nf_table.mat'
 
 # The reference allocates 8 nonlinearities but only ever fills/uses 1, 3, 5, 7
 # (1-based). Entries 2, 4, 6, 8 stay at zero and still take part in the max(), so a
@@ -125,15 +124,15 @@ def _standardize(z, T):
     u = z_real / sigma_R
     v = sigma_R * z_imag / sqrt_D1 - rho * z_real / sigma_R / sqrt_D1
     return {
-        "z_real": z_real,
-        "z_imag": z_imag,
-        "sigma_R2": sigma_R2,
-        "sigma_I2": sigma_I2,
-        "sigma_R": sigma_R,
-        "rho": rho,
-        "Delta1": Delta1,
-        "u": u,
-        "v": v,
+        'z_real': z_real,
+        'z_imag': z_imag,
+        'sigma_R2': sigma_R2,
+        'sigma_I2': sigma_I2,
+        'sigma_R': sigma_R,
+        'rho': rho,
+        'Delta1': Delta1,
+        'u': u,
+        'v': v,
     }
 
 
@@ -148,16 +147,16 @@ def _bounds(nf, x, T):
 
     # G1 = x^4
     EG[0] = np.sum(xx * xx) / T
-    NE[0] = _ne_bound_g1(nf["nf1"], EG[0])
+    NE[0] = _ne_bound_g1(nf['nf1'], EG[0])
     # G3 = |x|/(1+|x|)
     EG[2] = np.sum(abs_x / (1 + abs_x)) / T
-    NE[2] = _ne_bound_slope(nf["nf3"], EG[2])
+    NE[2] = _ne_bound_slope(nf['nf3'], EG[2])
     # G5 = x*|x|/(10+|x|)
     EG[4] = np.sum(x * abs_x / (10 + abs_x)) / T
-    NE[4] = _ne_bound_slope(nf["nf5"], EG[4])
+    NE[4] = _ne_bound_slope(nf['nf5'], EG[4])
     # G7 = x/(1+x^2)
     EG[6] = np.sum(x / (1 + xx)) / T
-    NE[6] = _ne_bound_slope(nf["nf7"], EG[6])
+    NE[6] = _ne_bound_slope(nf['nf7'], EG[6])
 
     return NE, EG, xx, sign_x, abs_x
 
@@ -188,32 +187,28 @@ def _sea(Xc, nf, rng, tolerance, maxiter_sea=100, max_cost_increase_number=10):
         cost = 0.0
 
         for n in range(N):
-            vec = W[n]                       # MATLAB v = W(n,:).'  (plain transpose)
-            y = vec @ Xc                     # MATLAB y = v.'*Xc
+            vec = W[n]  # MATLAB v = W(n,:).'  (plain transpose)
+            y = vec @ Xc  # MATLAB y = v.'*Xc
             Cv = C @ vec
-            vec = (
-                Xc.conj() @ (y * y * np.conj(y)) / T
-                - 2 * vec
-                - (vec @ Cv) * np.conj(Cv)
-            )
-            W[n] = vec                       # MATLAB W(n,:) = v.'
+            vec = Xc.conj() @ (y * y * np.conj(y)) / T - 2 * vec - (vec @ Cv) * np.conj(Cv)
+            W[n] = vec  # MATLAB W(n,:) = v.'
 
             # --- evaluate the cost with the PRE-update row (z = y) ---
             st = _standardize(y, T)
-            cost += 0.5 * np.log(st["Delta1"]) + np.log(2 * np.pi) + 1
+            cost += 0.5 * np.log(st['Delta1']) + np.log(2 * np.pi) + 1
 
-            NE_u, _, _, _, _ = _bounds(nf, st["u"], T)
-            NE_v, _, _, _, _ = _bounds(nf, st["v"], T)
+            NE_u, _, _, _, _ = _bounds(nf, st['u'], T)
+            NE_v, _, _, _, _ = _bounds(nf, st['v'], T)
             cost -= NE_u.max() + NE_v.max()
 
         if cost < min_cost:
             min_cost = cost
             cost_increase_counter = 0
-            best_W = last_W          # the W this cost was computed from
+            best_W = last_W  # the W this cost was computed from
         else:
             cost_increase_counter += 1
 
-        W = _sym_decorrelate(W)      # returns a fresh array
+        W = _sym_decorrelate(W)  # returns a fresh array
         if cost_increase_counter > max_cost_increase_number:
             break
         if 1 - np.min(np.abs(np.diag(W @ last_W.conj().T))) < tolerance:
@@ -223,8 +218,7 @@ def _sea(Xc, nf, rng, tolerance, maxiter_sea=100, max_cost_increase_number=10):
     return best_W
 
 
-def _north(X, W0, max_iter_north, mu0_north, max_cost_increase_number,
-           stochastic_search, nf, rng):
+def _north(X, W0, max_iter_north, mu0_north, max_cost_increase_number, stochastic_search, nf, rng):
     """``complex_ICA_EBM_north``: the nonorthogonal ICA optimizer (CEBM:269-711).
 
     ``type2`` is fixed at 0 (see the module docstring); the second-kind entropy bound
@@ -263,45 +257,37 @@ def _north(X, W0, max_iter_north, mu0_north, max_cost_increase_number,
                     inv_Q = np.linalg.inv(Wn @ Wn.conj().T)
                 else:
                     n_last = n - 1  # 0-based; MATLAB's n_last is (n-1) 1-based
-                    Wn_last = np.vstack([W[:n_last], W[n_last + 1:]])
+                    Wn_last = np.vstack([W[:n_last], W[n_last + 1 :]])
                     w_current = W[n].conj()
                     w_last = W[n_last].conj()
                     c = Wn_last @ (w_last - w_current)
-                    c[n_last] = 0.5 * (
-                        w_last.conj() @ w_last - w_current.conj() @ w_current
-                    )
+                    c[n_last] = 0.5 * (w_last.conj() @ w_last - w_current.conj() @ w_current)
 
                     temp1 = inv_Q @ c
                     temp2 = inv_Q[:, n_last]
-                    inv_Q_plus = inv_Q - np.outer(temp1, temp2.conj()) / (
-                        1 + temp1[n_last]
-                    )
+                    inv_Q_plus = inv_Q - np.outer(temp1, temp2.conj()) / (1 + temp1[n_last])
 
                     temp1 = inv_Q_plus.conj().T @ c
                     temp2 = inv_Q_plus[:, n_last]
-                    inv_Q = inv_Q_plus - np.outer(temp2, temp1.conj()) / (
-                        1 + c.conj() @ temp2
-                    )
+                    inv_Q = inv_Q_plus - np.outer(temp2, temp1.conj()) / (1 + c.conj() @ temp2)
                     inv_Q = (inv_Q + inv_Q.conj().T) / 2  # inv_Q is Hermitian
 
                 temp1 = rng.standard_normal(N).astype(np.complex128)
-                W_n = np.vstack([W[:n], W[n + 1:]])
+                W_n = np.vstack([W[:n], W[n + 1 :]])
                 h = temp1 - W_n.conj().T @ inv_Q @ W_n @ temp1
             else:
                 temp1 = rng.standard_normal(N).astype(np.complex128)
-                temp2 = np.vstack([W[:n], W[n + 1:]])
-                h = temp1 - temp2.conj().T @ np.linalg.solve(
-                    temp2 @ temp2.conj().T, temp2 @ temp1
-                )
+                temp2 = np.vstack([W[:n], W[n + 1 :]])
+                h = temp1 - temp2.conj().T @ np.linalg.solve(temp2 @ temp2.conj().T, temp2 @ temp1)
 
-            w = W[n].conj()          # MATLAB w = W(n,:)'
-            z = w.conj() @ X         # MATLAB z = w'*X  == W(n,:) @ X
+            w = W[n].conj()  # MATLAB w = W(n,:)'
+            z = w.conj() @ X  # MATLAB z = w'*X  == W(n,:) @ X
 
             st = _standardize(z, T)
-            z_real, z_imag = st["z_real"], st["z_imag"]
-            sigma_R2, sigma_I2 = st["sigma_R2"], st["sigma_I2"]
-            sigma_R, rho, Delta1 = st["sigma_R"], st["rho"], st["Delta1"]
-            u, v = st["u"], st["v"]
+            z_real, z_imag = st['z_real'], st['z_imag']
+            sigma_R2, sigma_I2 = st['sigma_R2'], st['sigma_I2']
+            sigma_R, rho, Delta1 = st['sigma_R'], st['rho'], st['Delta1']
+            u, v = st['u'], st['v']
             sqrt_D1 = np.sqrt(Delta1)
 
             cost += 0.5 * np.log(Delta1)
@@ -327,34 +313,28 @@ def _north(X, W0, max_iter_north, mu0_north, max_cost_increase_number,
             # --- gradient contribution from the real part (u) ---
             if p0 in _USED:
                 if p0 == 1:  # G = x^4, g = 4x^3   (note: the reference does NOT clip here)
-                    vEGu = simplified_ppval(nf["nf1"].pp_slope, EGu[0])
+                    vEGu = simplified_ppval(nf['nf1'].pp_slope, EGu[0])
                     gu = 4 * uu * u
                 elif p0 == 3:  # G = |x|/(1+|x|), g = sign(x)/(1+|x|)^2
-                    vEGu = simplified_ppval(
-                        nf["nf3"].pp_slope, _clip(nf["nf3"], EGu[2])
-                    )
+                    vEGu = simplified_ppval(nf['nf3'].pp_slope, _clip(nf['nf3'], EGu[2]))
                     gu = sign_u / (1 + abs_u) ** 2
                 elif p0 == 5:  # G = x|x|/(10+|x|), g = |x|(20+|x|)/(10+|x|)^2
-                    vEGu = simplified_ppval(
-                        nf["nf5"].pp_slope, _clip(nf["nf5"], EGu[4])
-                    )
+                    vEGu = simplified_ppval(nf['nf5'].pp_slope, _clip(nf['nf5'], EGu[4]))
                     gu = abs_u * (20 + abs_u) / (10 + abs_u) ** 2
                 else:  # p0 == 7; G = x/(1+x^2), g = (1-x^2)/(1+x^2)^2
-                    vEGu = simplified_ppval(
-                        nf["nf7"].pp_slope, _clip(nf["nf7"], EGu[6])
-                    )
+                    vEGu = simplified_ppval(nf['nf7'].pp_slope, _clip(nf['nf7'], EGu[6]))
                     gu = (1 - uu) / (1 + uu) ** 2
 
                 grad = 0.5 * grad_delta1 / Delta1
                 grad = grad - vEGu * (X @ (weight * gu)) / sw / 2 / sigma_R
-                grad = grad - vEGu * np.sum(-weight * gu * z_real) / sw / 4 / (
-                    sigma_R**3
-                ) * (R_xxt @ w.conj())
+                grad = grad - vEGu * np.sum(-weight * gu * z_real) / sw / 4 / (sigma_R**3) * (
+                    R_xxt @ w.conj()
+                )
             elif grad is None:
                 raise RuntimeError(
-                    "complex ICA-EBM: every real-part negentropy bound was negative on "
-                    "the first component, so no gradient is defined (MATLAB errors here "
-                    "too). The data may be degenerate."
+                    'complex ICA-EBM: every real-part negentropy bound was negative on '
+                    'the first component, so no gradient is defined (MATLAB errors here '
+                    'too). The data may be degenerate.'
                 )
 
             weight = rng.random(T) if stochastic_search else np.ones(T)
@@ -363,25 +343,19 @@ def _north(X, W0, max_iter_north, mu0_north, max_cost_increase_number,
             # --- gradient contribution from the imaginary part (v) ---
             if q0 in _USED:
                 if q0 == 1:  # G = x^4
-                    vEGv = simplified_ppval(nf["nf1"].pp_slope, EGv[0])
+                    vEGv = simplified_ppval(nf['nf1'].pp_slope, EGv[0])
                     gv = 4 * vv * v
                     gv_v = 4 * vv * vv  # g(v)*v
                 elif q0 == 3:  # G = |x|/(1+|x|)
-                    vEGv = simplified_ppval(
-                        nf["nf3"].pp_slope, _clip(nf["nf3"], EGv[2])
-                    )
+                    vEGv = simplified_ppval(nf['nf3'].pp_slope, _clip(nf['nf3'], EGv[2]))
                     gv = sign_v / (1 + abs_v) ** 2
                     gv_v = abs_v / (1 + abs_v) ** 2
                 elif q0 == 5:  # G = x|x|/(10+|x|)
-                    vEGv = simplified_ppval(
-                        nf["nf5"].pp_slope, _clip(nf["nf5"], EGv[4])
-                    )
+                    vEGv = simplified_ppval(nf['nf5'].pp_slope, _clip(nf['nf5'], EGv[4]))
                     gv = abs_v * (20 + abs_v) / (10 + abs_v) ** 2
                     gv_v = gv * v
                 else:  # q0 == 7; G = x/(1+x^2)
-                    vEGv = simplified_ppval(
-                        nf["nf7"].pp_slope, _clip(nf["nf7"], EGv[6])
-                    )
+                    vEGv = simplified_ppval(nf['nf7'].pp_slope, _clip(nf['nf7'], EGv[6]))
                     gv = (1 - vv) / (1 + vv) ** 2
                     gv_v = gv * v
 
@@ -399,11 +373,11 @@ def _north(X, W0, max_iter_north, mu0_north, max_cost_increase_number,
 
             w1 = w - mu * grad
             w1 = w1 / np.linalg.norm(w1)
-            W[n] = w1.conj()             # MATLAB W(n,:) = w1'
+            W[n] = w1.conj()  # MATLAB W(n,:) = w1'
 
         if cost < min_cost:
             min_cost = cost
-            best_W = last_W          # the W this cost was computed from
+            best_W = last_W  # the W this cost was computed from
             max_negentropy = negentropy_array.copy()
             cost_increase_counter = 0
         else:
@@ -426,7 +400,7 @@ def _north(X, W0, max_iter_north, mu0_north, max_cost_increase_number,
     W = best_W
 
     # sort the components by negentropy, descending
-    index_sort = np.argsort(-max_negentropy, kind="stable")
+    index_sort = np.argsort(-max_negentropy, kind='stable')
     return W[index_sort, :]
 
 
@@ -459,7 +433,7 @@ def cebm(X, nf_table_path=None, rng=None, tol=1e-4, max_iter=None):
     """
     X = np.asarray(X, dtype=np.complex128)
     if X.ndim != 2:
-        raise ValueError(f"X must be 2-D (N, T); got shape {X.shape}")
+        raise ValueError(f'X must be 2-D (N, T); got shape {X.shape}')
 
     rng = np.random.default_rng() if rng is None else rng
     nf = load_nf_table(_DEFAULT_NF_TABLE if nf_table_path is None else nf_table_path)

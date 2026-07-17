@@ -1,6 +1,6 @@
 # GIFT
 
-MATLAB toolbox (GroupICAT/) plus a Python port under `python/` (`complex-gift`).
+MATLAB toolbox (GroupICAT/) plus a Python port under `python/` (the `gift` package, src-layout at `python/src/gift/`).
 
 ## Environment
 

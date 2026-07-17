@@ -29,6 +29,6 @@ def match_sources(S_est, S_true):
     St = S_true - S_true.mean(axis=1, keepdims=True)
     Se = Se / np.linalg.norm(Se, axis=1, keepdims=True)
     St = St / np.linalg.norm(St, axis=1, keepdims=True)
-    C = np.abs(Se @ St.conj().T)          # (n_est, n_true)
+    C = np.abs(Se @ St.conj().T)  # (n_est, n_true)
     perm = C.argmax(axis=1)
     return perm, C.max(axis=1)

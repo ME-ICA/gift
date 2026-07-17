@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from complex_gift.whiten import strong_uncorrelating_transform, whiten_hermitian
+from gift.whiten import strong_uncorrelating_transform, whiten_hermitian
 
 
 def test_hermitian_whitening_decorrelates():
@@ -10,7 +10,7 @@ def test_hermitian_whitening_decorrelates():
     S = rng.standard_normal((N, T)) + 1j * rng.standard_normal((N, T))
     Amix = rng.standard_normal((P, N)) + 1j * rng.standard_normal((P, N))
     X = Amix @ S
-    Xw, W_wh, W_dw = whiten_hermitian(X, n_components=N)
+    Xw, _W_wh, _W_dw = whiten_hermitian(X, n_components=N)
     assert Xw.shape == (N, T)
     assert Xw.dtype == np.complex128
     C = Xw @ Xw.conj().T / T
@@ -24,7 +24,7 @@ def test_dewhitening_reconstructs_signal_subspace():
     Amix = rng.standard_normal((P, N)) + 1j * rng.standard_normal((P, N))
     X = Amix @ S
     Xc = X - X.mean(axis=1, keepdims=True)
-    Xw, W_wh, W_dw = whiten_hermitian(X, n_components=N)
+    Xw, _W_wh, W_dw = whiten_hermitian(X, n_components=N)
     # data is exactly rank N, so dewhitening must reconstruct it
     assert np.allclose(W_dw @ Xw, Xc, atol=1e-6)
 
@@ -33,7 +33,7 @@ def test_raises_when_more_components_than_rows():
     rng = np.random.default_rng(4)
     P, T = 5, 500
     X = rng.standard_normal((P, T)) + 1j * rng.standard_normal((P, T))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='exceeds the number of'):
         whiten_hermitian(X, n_components=12)
 
 
@@ -45,8 +45,8 @@ def test_raises_on_rank_deficient_input():
     T = 500
     base = rng.standard_normal((3, T)) + 1j * rng.standard_normal((3, T))
     mix = rng.standard_normal((6, 3)) + 1j * rng.standard_normal((6, 3))
-    X = mix @ base                      # (6, T), exactly rank 3
-    with pytest.raises(ValueError):
+    X = mix @ base  # (6, T), exactly rank 3
+    with pytest.raises(ValueError, match='rank-deficient'):
         whiten_hermitian(X, n_components=4)
 
 
@@ -57,9 +57,9 @@ def test_sut_diagonalizes_covariance_and_pseudo_covariance():
     S = rng.standard_normal((N, T)) + 1j * 0.3 * rng.standard_normal((N, T))
     Amix = rng.standard_normal((N, N)) + 1j * rng.standard_normal((N, N))
     X = Amix @ S
-    Xs, W_sut = strong_uncorrelating_transform(X)
-    C = Xs @ Xs.conj().T / T          # covariance -> identity
-    Pc = Xs @ Xs.T / T                # pseudo-covariance -> diagonal (real, nonneg)
+    Xs, _W_sut = strong_uncorrelating_transform(X)
+    C = Xs @ Xs.conj().T / T  # covariance -> identity
+    Pc = Xs @ Xs.T / T  # pseudo-covariance -> diagonal (real, nonneg)
     assert np.allclose(C, np.eye(N), atol=1e-2)
     off = Pc - np.diag(np.diag(Pc))
     assert np.abs(off).max() < 1e-2 * max(1.0, np.abs(np.diag(Pc)).max())
@@ -106,9 +106,9 @@ def test_sut_handles_degenerate_singular_values():
     X = Q @ Xbase
     T = X.shape[1]
 
-    Xs, W_sut = strong_uncorrelating_transform(X)
-    C = Xs @ Xs.conj().T / T          # covariance -> identity
-    Pc = Xs @ Xs.T / T                # pseudo-covariance -> diagonal (real, nonneg)
+    Xs, _W_sut = strong_uncorrelating_transform(X)
+    C = Xs @ Xs.conj().T / T  # covariance -> identity
+    Pc = Xs @ Xs.T / T  # pseudo-covariance -> diagonal (real, nonneg)
     assert np.allclose(C, np.eye(N), atol=1e-2)
     off = Pc - np.diag(np.diag(Pc))
     assert np.abs(off).max() < 1e-2 * max(1.0, np.abs(np.diag(Pc)).max())

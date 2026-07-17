@@ -1,6 +1,6 @@
 import numpy as np
 
-from complex_gift.phase_correct import align_to_reference, correct_phase
+from gift.phase_correct import align_to_reference, correct_phase
 
 
 def _aligned_sources(rng, N=4, V=3000):
@@ -19,7 +19,7 @@ def test_reconstruction_is_preserved():
     A = A0 * np.exp(-1j * theta_true)[None, :]
 
     X_before = A @ S
-    Sc, Ac, theta = correct_phase(S, A)
+    Sc, Ac, _theta = correct_phase(S, A)
     rel = np.linalg.norm(X_before - Ac @ Sc) / np.linalg.norm(X_before)
     assert rel < 1e-10
 
@@ -34,7 +34,7 @@ def test_injected_rotation_is_removed():
     S = S0 * np.exp(1j * theta_true)[:, None]
     A = A0 * np.exp(-1j * theta_true)[None, :]
 
-    Sc, Ac, theta = correct_phase(S, A)
+    Sc, _Ac, _theta = correct_phase(S, A)
     imag_frac = (Sc.imag**2).sum(axis=1) / (np.abs(Sc) ** 2).sum(axis=1)
     assert np.all(imag_frac < 0.05)
     # residual major-axis angle is ~0 mod pi
@@ -52,7 +52,7 @@ def test_mask_restricts_the_estimate():
     mask = np.zeros(V, dtype=bool)
     mask[: V // 2] = True
     S_dirty = S.copy()
-    S_dirty[:, ~mask] *= 50.0 * np.exp(1j * 1.3)      # wild values outside the mask
+    S_dirty[:, ~mask] *= 50.0 * np.exp(1j * 1.3)  # wild values outside the mask
 
     _, _, theta_clean = correct_phase(S.copy(), A.copy(), mask=mask)
     _, _, theta_dirty = correct_phase(S_dirty, A.copy(), mask=mask)

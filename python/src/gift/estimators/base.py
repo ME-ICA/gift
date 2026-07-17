@@ -8,9 +8,9 @@ import numpy as np
 
 @dataclass
 class EstimatorResult:
-    W: np.ndarray   # (N, N) demixing:  S = W @ X
-    A: np.ndarray   # (N, N) mixing:    X ~ A @ S
-    S: np.ndarray   # (N, T) sources
+    W: np.ndarray  # (N, N) demixing:  S = W @ X
+    A: np.ndarray  # (N, N) mixing:    X ~ A @ S
+    S: np.ndarray  # (N, T) sources
 
 
 class Estimator(Protocol):
