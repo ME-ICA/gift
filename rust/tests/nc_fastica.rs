@@ -1,7 +1,7 @@
 mod common;
 
 use common::{isi, load_c64, match_sources};
-use complex_gift::estimators::nc_fastica::nc_fastica;
+use gift_rs::estimators::nc_fastica::nc_fastica;
 
 #[test]
 fn separates_the_shared_fixture_as_well_as_the_matlab_reference() {
@@ -44,7 +44,7 @@ fn separates_the_shared_fixture_as_well_as_the_matlab_reference() {
 
 #[test]
 fn default_max_iter_is_the_reference_cap_of_15n() {
-    use complex_gift::estimators::nc_fastica::resolve_max_iter;
+    use gift_rs::estimators::nc_fastica::resolve_max_iter;
     // MATLAB's maxcounter=50 is dead code; the real cap is 15*n. The shared fixture
     // converges in ~16 iterations, so neither cap ever bites and comparing OUTPUTS
     // cannot tell 50 from 90 - assert the resolution itself, which a regression to

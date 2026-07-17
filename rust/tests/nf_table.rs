@@ -1,7 +1,7 @@
 mod common;
 
 use common::{fixtures_dir, load_f64};
-use complex_gift::nf_table::{load_nf_table, simplified_ppval};
+use gift_rs::nf_table::{load_nf_table, simplified_ppval};
 
 #[test]
 fn tables_have_the_expected_structure() {

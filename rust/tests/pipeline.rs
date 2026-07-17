@@ -1,7 +1,7 @@
 mod common;
 
 use common::{fixtures_dir, match_sources, TestRng};
-use complex_gift::pipeline::{align_subject, run_complex_ica, Estimator};
+use gift_rs::pipeline::{align_subject, run_complex_ica, Estimator};
 use nalgebra::DMatrix;
 use num_complex::Complex64;
 

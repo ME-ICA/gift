@@ -1,7 +1,7 @@
 mod common;
 
 use common::load_c64;
-use complex_gift::whiten::whiten_hermitian;
+use gift_rs::whiten::whiten_hermitian;
 use nalgebra::DMatrix;
 use num_complex::Complex64;
 

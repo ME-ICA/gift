@@ -1,7 +1,7 @@
 mod common;
 
 use common::{load_c64, load_f64, load_u8};
-use complex_gift::phase_correct::{align_to_reference, correct_phase};
+use gift_rs::phase_correct::{align_to_reference, correct_phase};
 
 #[test]
 fn correct_phase_matches_python_elementwise() {

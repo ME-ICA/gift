@@ -1,7 +1,7 @@
 mod common;
 
 use common::{load_c64, load_f64, load_u8};
-use complex_gift::phase_mask::{otsu_threshold, phase_quality_mask, quality_map};
+use gift_rs::phase_mask::{otsu_threshold, phase_quality_mask, quality_map};
 
 #[test]
 fn quality_map_matches_python_elementwise() {

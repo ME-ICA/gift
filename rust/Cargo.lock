@@ -51,18 +51,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
-name = "complex-gift"
-version = "0.1.0"
-dependencies = [
- "nalgebra",
- "ndarray",
- "nifti",
- "npyz",
- "num-complex",
- "num-traits",
-]
-
-[[package]]
 name = "crc32fast"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -85,6 +73,18 @@ checksum = "843fba2746e448b37e26a819579957415c8cef339bf08564fe8b7ddbd959573c"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
+]
+
+[[package]]
+name = "gift-rs"
+version = "0.1.0"
+dependencies = [
+ "nalgebra",
+ "ndarray",
+ "nifti",
+ "npyz",
+ "num-complex",
+ "num-traits",
 ]
 
 [[package]]

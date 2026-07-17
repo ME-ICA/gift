@@ -1,8 +1,8 @@
 mod common;
 
 use common::{match_sources, TestRng};
-use complex_gift::group::{back_reconstruct, two_stage_pca};
-use complex_gift::whiten::whiten_hermitian;
+use gift_rs::group::{back_reconstruct, two_stage_pca};
+use gift_rs::whiten::whiten_hermitian;
 use nalgebra::DMatrix;
 use num_complex::Complex64;
 

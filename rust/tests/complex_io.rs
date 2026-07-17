@@ -2,7 +2,7 @@ mod common;
 
 use std::path::Path;
 
-use complex_gift::complex_io::{complex_file_pair, read_complex, ComplexType};
+use gift_rs::complex_io::{complex_file_pair, read_complex, ComplexType};
 
 // The fixtures directory holds two small NIfTI volumes written by nibabel for this test:
 // complex_ica_fixtures/npy/../nifti/{R_probe.nii, I_probe.nii} (see Step 3).
@@ -40,7 +40,7 @@ fn file_pair_requires_an_underscore() {
 
 #[test]
 fn write_then_read_roundtrips() {
-    use complex_gift::complex_io::write_complex;
+    use gift_rs::complex_io::write_complex;
     use num_complex::Complex64;
 
     let dir = std::env::temp_dir().join("cg_rust_io_roundtrip");

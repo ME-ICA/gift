@@ -1,12 +1,12 @@
 [package]
-name = "complex-gift"
+name = "gift-rs"
 version = "0.1.0"
 edition = "2021"
 description = "Complex-valued fMRI ICA - Rust port of GIFT's complex ICA pipeline"
 license = "GPL-3.0-or-later"
 
 [lib]
-name = "complex_gift"
+name = "gift_rs"
 path = "src/lib.rs"
 
 [dependencies]

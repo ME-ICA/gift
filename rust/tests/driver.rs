@@ -1,9 +1,9 @@
 mod common;
 
 use common::{fixtures_dir, TestRng};
-use complex_gift::complex_io::{read_complex, ComplexType};
-use complex_gift::driver::{run_from_files, unmask};
-use complex_gift::pipeline::Estimator;
+use gift_rs::complex_io::{read_complex, ComplexType};
+use gift_rs::driver::{run_from_files, unmask};
+use gift_rs::pipeline::Estimator;
 use nalgebra::DMatrix;
 use num_complex::Complex64;
 

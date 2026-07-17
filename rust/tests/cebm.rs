@@ -1,7 +1,7 @@
 mod common;
 
 use common::{fixtures_dir, isi, load_c64, match_sources};
-use complex_gift::estimators::cebm::{cebm, pseudo_cov};
+use gift_rs::estimators::cebm::{cebm, pseudo_cov};
 use nalgebra::DMatrix;
 use num_complex::Complex64;
 
